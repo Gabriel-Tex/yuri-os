@@ -1,83 +1,71 @@
-# Arquitetura da primeira parte do projeto
+# Arquitetura do atendimento de clientes
 
-Este é o repositório de implementação do projeto. Nesta entrega existem somente documentos. A árvore de fontes descrita adiante é uma proposta para as próximas etapas, não um inventário de arquivos já implementados.
+Esta arquitetura cobre a primeira parte do trabalho prático. O repositório ainda está na fase de documentação; a estrutura de código abaixo descreve a implementação prevista. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções para quem for desenvolvê-la.
 
-## 1. Fontes, escopo e classificação
+## Fontes e alcance
 
-As fontes foram consultadas no arquivo `sistemas-operacionais.zip`, recebido como contexto, sem modificar o ZIP nem o repositório de estudos que ele representa:
+Usamos três identificadores para evitar confundir o que foi pedido com o que foi escolhido aqui:
 
-| Fonte dentro do ZIP | Uso |
-|---|---|
-| `sistemas-operacionais/CONTEXT.md` | Contexto da disciplina e finalidade do repositório de estudos. A identificação deste diretório como repositório do projeto foi esclarecida pelo usuário e prevalece sobre aquele contexto. |
-| `sistemas-operacionais/work/descfinal.pdf`, página 1 | Requisitos e critérios de avaliação do trabalho 1. |
-| Mesmo PDF, página 2, diagrama e notas | Protocolo entre processos, dados dos clientes, instante de chegada e limite da fila. Essa página contém informações visuais ausentes na extração textual. |
-| Mesmo PDF, página 3 | Código de referência do cliente fornecido. |
-| `sistemas-operacionais/work/about.md` | Anotações informais sobre as aulas; não ampliam automaticamente o escopo do trabalho 1. |
-| `sistemas-operacionais/context/context.c` | Exemplo didático de troca de contexto; não deve ser copiado como solução pronta. |
+- **R:** requisito do trabalho.
+- **P:** comportamento do cliente de referência que a integração precisa respeitar.
+- **D:** decisão arquitetural do projeto. Uma revisão de D não pode contrariar R nem o contrato P.
 
-Os requisitos essenciais estão transcritos de forma estruturada neste documento e no [AGENTS.md](../AGENTS.md), sem dependência de caminhos temporários da máquina. Os caminhos acima identificam a origem; não são arquivos existentes neste projeto.
+O trabalho é uma aplicação de espaço de usuário em Linux. Shell, memória virtual, sistema de arquivos próprio e funcionalidades da segunda parte ficam fora desta implementação. A avaliação compara funcionamento, satisfação e tempo; regras de nota, possibilidade de dupla e data de apresentação pertencem ao contexto da disciplina, sem gerar funcionalidades do programa. A data impressa no PDF não é tratada como prazo atual.
 
-Classificações adotadas:
+## Requisitos do trabalho
 
-- **R — requisito:** exigência do texto ou do anexo do professor.
-- **P — protocolo:** comportamento do cliente de referência que a integração precisa preservar.
-- **D — decisão:** escolha desta arquitetura, passível de revisão documentada sem violar R ou P.
-
-O projeto é uma aplicação de espaço de usuário em Linux. Não será desenvolvido um kernel, shell, gerenciador de memória virtual ou componente da segunda parte. As notas gerais da disciplina não são autorização para antecipar essas funcionalidades.
-
-## 2. Requisitos rastreáveis
-
-| ID | Exigência | Origem |
+| ID | Requisito | Fonte |
 |---|---|---|
-| R01 | Usar Linux e C; não utilizar bibliotecas que implementem o paralelismo ou a comunicação entre processos pelo projeto. | PDF p. 1 |
-| R02 | Ter pelo menos as threads Recepção e Atendente, criadas por troca de contexto, com escalonador próprio. | PDF p. 1 e diagrama |
-| R03 | Receber N e X; criar N clientes quando N > 0 e gerar continuamente quando N = 0. | PDF p. 1 |
-| R04 | A Recepção atribui prioridade alta ou baixa aleatoriamente, com 50% de probabilidade para cada uma. | PDF p. 1 |
-| R05 | A paciência é X ms na prioridade baixa e X/2 ms na alta. | PDF p. 1 e nota 3 |
-| R06 | A satisfação depende de conclusão menos chegada ser menor ou igual à paciência, incluindo espera e atendimento. | PDF p. 1 e nota 6 |
-| R07 | No modo finito, concluir o atendimento de todos os N clientes e retornar satisfeitos/total. | PDF p. 1 |
-| R08 | No modo infinito, parar por s e calcular satisfação somente entre os atendidos, ignorando os que ficaram esperando. | PDF p. 1 |
-| R09 | Escrever o PID de cada cliente atendido em arquivo consumido por um processo Analista. | PDF p. 1 |
-| R10 | Criar o Analista dormindo; a thread Atendente coordena seus despertares. | PDF p. 1 e diagrama |
-| R11 | A cada despertar, imprimir no máximo os dez primeiros registros e apagar somente os impressos. | PDF p. 1 e diagrama |
-| R12 | Antes de encerrar o modo infinito, despertar o Analista quantas vezes forem necessárias para esvaziar o arquivo. | PDF p. 1 |
-| R13 | Manter PID, chegada, prioridade e demanda do cliente; chegada é o intervalo entre o início do programa e a criação do cliente. | Diagrama e nota 4 |
-| R14 | Ler a demanda escrita pelo cliente antes de inseri-lo na fila; o arquivo compartilhado exige inserções serializadas. | Diagrama e nota 7 |
-| R15 | No modo infinito, pausar a geração com 100 clientes em espera e retomar quando houver espaço. | Nota 9 do diagrama |
-| R16 | Respeitar o protocolo de semáforo de atendimento, proteção do arquivo e identificação do Analista por arquivo de PID. | Diagrama e cliente p. 3 |
-| R17 | Integrar o mesmo cliente fornecido pelo professor, sem alterar sua carga para obter vantagem. | PDF p. 1 e nota 5 |
-| R18 | Apresentar o tempo total de execução. | PDF p. 1 e nota 8 |
+| R01 | Implementar em C no Linux, sem bibliotecas que façam o paralelismo ou a comunicação entre processos pelo projeto. | Texto, p. 1 |
+| R02 | Criar pelo menos as threads Recepção e Atendente por troca de contexto e implementar o escalonador. | Texto, p. 1; diagrama |
+| R03 | Receber N e X. N > 0 gera N clientes; N = 0 mantém a geração contínua. | Texto, p. 1 |
+| R04 | Sortear a prioridade na Recepção, com probabilidade de 50% para cada classe. | Texto, p. 1 |
+| R05 | Aplicar paciência X ms à prioridade baixa e X/2 ms à alta. | Texto, p. 1; nota 3 |
+| R06 | Considerar satisfeito quem termina em até sua paciência, medida desde a chegada e incluindo espera e atendimento. | Texto, p. 1; nota 6 |
+| R07 | No modo finito, atender todos os N e informar satisfeitos/total. | Texto, p. 1 |
+| R08 | No modo infinito, encerrar por s e calcular a taxa apenas sobre clientes atendidos. | Texto, p. 1 |
+| R09 | Gravar o PID atendido em arquivo para leitura pelo processo Analista. | Texto, p. 1 |
+| R10 | Criar o Analista dormindo e despertá-lo sob coordenação do Atendente. | Texto, p. 1; diagrama |
+| R11 | Por despertar, imprimir no máximo os dez primeiros PIDs e removê-los do arquivo. | Texto, p. 1; diagrama |
+| R12 | Antes de encerrar o modo infinito, despertar o Analista até esvaziar o arquivo. | Texto, p. 1 |
+| R13 | Guardar PID, chegada, prioridade e demanda. Chegada corresponde à criação do processo, medida desde o início do programa. | Diagrama; nota 4 |
+| R14 | Ler a demanda escrita pelo cliente antes de enfileirá-lo e serializar criações que compartilham esse arquivo. | Diagrama; nota 7 |
+| R15 | No modo infinito, pausar a geração com 100 clientes em espera e retomar quando houver vaga. | Nota 9 |
+| R16 | Seguir o protocolo de semáforos do atendimento e do arquivo, além do arquivo de PID do Analista. | Diagrama; cliente p. 3 |
+| R17 | Integrar o cliente fornecido, preservando sua carga e seu comportamento. | Texto, p. 1; nota 5 |
+| R18 | Informar o tempo total da execução. | Texto, p. 1; nota 8 |
 
-A avaliação considera funcionamento, satisfação e tempo total. O enunciado permite trabalho individual ou em dupla. As regras de nota e a data de apresentação pertencem ao contexto de avaliação, não constituem funcionalidades a implementar. Nenhuma data histórica do PDF será tratada como prazo atual sem confirmação.
+O PDF ilustra o cliente, mas o ZIP não contém um arquivo `client.c` independente. A fonte oficial precisa ser conferida antes de declarar a integração concluída.
 
-## 3. Decisões arquiteturais
+## Decisões adotadas
 
-| ID | Decisão e justificativa |
-|---|---|
-| D01 | C17 e Linux/glibc como alvo inicial; usar primitivas de sistema, sem frameworks ou dependências externas de execução. |
-| D02 | Exatamente duas threads de usuário, cooperativas, executadas sobre uma única thread do kernel. Uma terceira thread só será considerada se surgir necessidade demonstrável. |
-| D03 | Usar getcontext/makecontext/swapcontext isolados no runtime. O exemplo de aula usa essa família; ela não pertence ao POSIX atual e sua disponibilidade deve ser verificada no alvo. |
-| D04 | Round-robin entre threads prontas; cada etapa de trabalho é limitada e termina em cessão, espera ou término. Não há preempção por timer. |
-| D05 | EDF não preemptivo para clientes: menor prazo absoluto primeiro, com desempate pela sequência de criação. Isso é uma política permitida, não exigida pelo professor nem uma promessa de satisfação ótima. |
-| D06 | Vetor com capacidade de 100 clientes esperando e seleção linear. Estender esse limite também ao modo finito limita recursos sem deixar de gerar N ao longo da execução. |
-| D07 | No máximo um cliente em inicialização e um em atendimento. O primeiro preserva o arquivo de demanda; o segundo representa um único Atendente. |
-| D08 | Em s, concluir o atendimento em andamento, cancelar os ainda não atendidos e drenar os registros. A satisfação inclui o atendimento em andamento se ele concluir normalmente. |
-| D09 | Criar recursos por execução em run/<execution-id>/; permitir uma instância por vez, pois o cliente usa nome global fixo de semáforo. |
-| D10 | Preservar demanda.txt como exceção de protocolo aprovada pelo usuário. Todos os nomes próprios novos serão em inglês. |
-| D11 | Usar tempo monotônico em nanossegundos; medir a conclusão quando o término do filho for observado. |
-| D12 | Despertar o Analista com dez registros, ao ficar sem clientes disponíveis com registros pendentes, ou durante a drenagem final. |
-| D13 | N é inteiro não negativo e X é inteiro positivo em ms, ambos representáveis sem overflow nas operações necessárias. X = 0 será rejeitado como decisão de validação. |
+| ID | Decisão | Motivo |
+|---|---|---|
+| D01 | C17 em Linux/glibc, sem dependências externas de execução. | Fixar o ambiente e manter o trabalho centrado nas primitivas do sistema. |
+| D02 | Duas threads cooperativas sobre uma thread do kernel. | Atender o requisito sem introduzir outra linha de execução. |
+| D03 | Isolar `getcontext`, `makecontext` e `swapcontext` no runtime. | Seguir a família usada em aula; verificar sua disponibilidade no alvo, pois ela não integra o POSIX atual. |
+| D04 | Round-robin entre threads prontas, com cessão explícita em etapas curtas. | Evitar preempção por timer e troca de contexto dentro de handlers. |
+| D05 | EDF não preemptivo para clientes, com desempate pela criação. | Selecionar o menor prazo absoluto sem interromper o atendimento iniciado. |
+| D06 | Vetor de 100 vagas e busca linear; aplicar o limite também ao modo finito. | Conter recursos sem impedir que N clientes sejam gerados ao longo da execução. |
+| D07 | No máximo um cliente em inicialização e um em atendimento. | Proteger a demanda compartilhada e representar o único Atendente. |
+| D08 | Ao receber s, concluir o atendimento atual, cancelar os demais e drenar os PIDs. | Definir um encerramento verificável e o denominador da taxa. |
+| D09 | Dados em `run/<execution-id>/` e somente uma instância ativa. | Isolar arquivos locais enquanto o cliente usa semáforo de nome global. |
+| D10 | Preservar `demanda.txt` como exceção aos nomes em inglês. | Compatibilidade literal com o cliente fornecido. |
+| D11 | Tempo monotônico em nanossegundos; conclusão no instante observado pelo pai. | Preservar X/2 quando X for ímpar e evitar saltos do relógio civil. |
+| D12 | Despertar o Analista com dez PIDs, na ociosidade com pendências ou na drenagem. | Escoar o arquivo sem exigir impressão após cada atendimento. |
+| D13 | Aceitar N inteiro não negativo e X inteiro positivo em ms; rejeitar conversão com overflow. | Definir uma CLI sem cálculos inválidos; rejeitar X = 0 é decisão de validação. |
 
-## 4. Organização do projeto
+O limite de 100 no modo finito, EDF, C17 e a drenagem finita são decisões do projeto. O enunciado não exige essas escolhas específicas. EDF seleciona pelo prazo, mas não garante satisfação ótima em toda carga.
 
-Na árvore, `{c,h}` representa dois arquivos, um `.c` e um `.h`. Todos são futuros, exceto os três documentos desta entrega.
+## Estrutura prevista
 
 ```text
 .
-├── AGENTS.md
-├── README.md
-├── Makefile
+├── .github/pull_request_template.md
 ├── .gitignore
+├── AGENTS.md
+├── Makefile
+├── README.md
 ├── docs/
 │   ├── architecture.md
 │   ├── user-stories.md
@@ -90,266 +78,203 @@ Na árvore, `{c,h}` representa dois arquivos, um `.c` e um `.h`. Todos são futu
 │   ├── analyst_main.c
 │   ├── domain/
 │   │   ├── client.h
-│   │   ├── client_queue.{c,h}
-│   │   └── metrics.{c,h}
+│   │   ├── client_queue.{h,c}
+│   │   └── metrics.{h,c}
 │   ├── app/
-│   │   ├── service.{c,h}
-│   │   └── workers.{c,h}
+│   │   ├── service.{h,c}
+│   │   └── workers.{h,c}
 │   ├── runtime/
-│   │   └── scheduler.{c,h}
+│   │   └── scheduler.{h,c}
 │   └── platform/
-│       ├── processes.{c,h}
-│       ├── ipc.{c,h}
-│       ├── completion_file.{c,h}
-│       ├── terminal.{c,h}
-│       └── clock.{c,h}
+│       ├── processes.{h,c}
+│       ├── ipc.{h,c}
+│       ├── completion_file.{h,c}
+│       ├── terminal.{h,c}
+│       └── clock.{h,c}
 ├── tests/
 │   ├── domain_test.c
 │   ├── scheduler_test.c
 │   ├── integration_test.sh
-│   └── fixtures/
-│       └── controlled_client.c
+│   └── fixtures/controlled_client.c
 ├── build/
 └── run/
 ```
 
-`build/` e `run/` são gerados e ignorados pelo Git. Não criar diretórios vazios ou arquivos de implementação apenas para reproduzir a árvore.
-
-### Documentação, construção e cliente
+Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por outros módulos; o `.c` implementa as operações e mantém auxiliares privados. `build/` e `run/` serão gerados e ignorados pelo Git; a árvore não pede diretórios vazios agora.
 
 | Arquivo | Responsabilidade |
 |---|---|
-| AGENTS.md | Restrições e padrões para agentes que trabalham neste projeto. |
-| README.md | Objetivo, ambiente, compilação, execução e interpretação do relatório. |
-| Makefile | Construir service, analyst e client; disponibilizar verificações, modo de depuração e limpeza dos próprios artefatos. |
-| .gitignore | Ignorar objetos, executáveis e dados locais de execução. |
-| docs/architecture.md | Arquitetura, requisitos, contratos e decisões. |
-| docs/user-stories.md | Backlog, critérios de aceitação, passos e rastreabilidade. |
-| docs/verification.md | Comandos de verificação, resultados e procedimento de medição de desempenho. |
-| provided/README.md | Origem e versão do cliente oficial, protocolo e unidades de tempo. |
-| provided/client.c | Fonte oficial, preservada. O ZIP contém uma referência no PDF, não um arquivo cliente.c independente; obter/conferir a fonte oficial antes de declarar integração concluída. |
+| `.github/pull_request_template.md` | Estrutura para contexto, mudanças, verificação e pendências de um PR. |
+| `.gitignore` | Excluir binários, objetos e dados locais de execução do versionamento. |
+| `AGENTS.md` | Regras do projeto e convenções para desenvolvimento assistido. |
+| `Makefile` | Construir `service`, `analyst` e `client`; oferecer alvos de teste, depuração e limpeza segura. |
+| `README.md` | Apresentar o projeto, ambiente, execução e significado do relatório. |
+| `docs/architecture.md` | Registrar requisitos, decisões, contratos e fluxos. |
+| `docs/user-stories.md` | Organizar entregas, aceite, dependências e rastreabilidade. |
+| `docs/verification.md` | Registrar comandos, resultados e condições de medição efetivamente usados. |
+| `provided/README.md` | Registrar origem, versão e peculiaridades do cliente oficial. |
+| `provided/client.c` | Preservar a fonte oficial quando recebida ou conferida; não usar a fixture de teste como substituta. |
+| `src/service_main.c` | Validar `N` e `X`, iniciar o serviço e apresentar o relatório. |
+| `src/analyst_main.c` | Executar a parada inicial e um lote por despertar do Analista. |
+| `src/domain/client.h` | Definir dados, prioridade e estados do cliente. O uso de `pid_t` é compatível com o alvo Linux. |
+| `src/domain/client_queue.h` / `.c` | Expor e implementar reserva, inserção, capacidade e seleção EDF da fila. |
+| `src/domain/metrics.h` / `.c` | Expor e implementar contadores, satisfação e taxa com instantes fornecidos pela aplicação. |
+| `src/app/service.h` / `.c` | Definir configuração/resultado e coordenar eventos, recursos, estado da execução e finalização. |
+| `src/app/workers.h` / `.c` | Expor e implementar as rotinas Recepção e Atendente e seus pontos de espera. |
+| `src/runtime/scheduler.h` / `.c` | Expor e implementar criação, despacho, cessão, espera, despertar e destruição dos contextos. |
+| `src/platform/processes.h` / `.c` | Definir eventos e encapsular criação, sinais, `waitpid`, máscaras e `pselect`. |
+| `src/platform/ipc.h` / `.c` | Definir e implementar propriedade, aquisição, liberação e limpeza de semáforos e bloqueio de instância. |
+| `src/platform/completion_file.h` / `.c` | Definir formato/operações e implementar inclusão e consumo ordenado de até dez PIDs. |
+| `src/platform/terminal.h` / `.c` | Definir e implementar leitura de s, entrada não bloqueante e restauração do terminal. |
+| `src/platform/clock.h` / `.c` | Definir instantes/durações e implementar relógio monotônico e conversões verificadas. |
+| `tests/domain_test.c` | Cobrir fila, prioridade, prazo e métricas com tempos artificiais. |
+| `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
+| `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
+| `tests/fixtures/controlled_client.c` | Produzir demandas, tempos e falhas controladas somente nos testes. |
 
-### Entradas e aplicação
-
-| Arquivo | Responsabilidade |
-|---|---|
-| src/service_main.c | Converter e validar N/X, iniciar o serviço e apresentar o resultado final. |
-| src/analyst_main.c | Preparar o Analista e executar seu ciclo de parada, lote e nova parada. |
-| src/app/service.c | Possuir o estado da execução e coordenar recursos, eventos, despertares e finalização. |
-| src/app/service.h | Expor configuração, resultado e entrada do serviço; declarar o contexto compartilhado necessário aos workers sem expor detalhes da fila ou dos contextos. |
-| src/app/workers.c | Conter as rotinas Recepção e Atendente, seus passos e pontos de espera/cessão. |
-| src/app/workers.h | Expor as duas rotinas de entrada; não publicar auxiliares internos. |
-
-### Domínio e runtime
-
-| Arquivo | Responsabilidade |
-|---|---|
-| src/domain/client.h | Definir o registro e os estados de um cliente. O PID pode usar pid_t, pois o alvo é explicitamente Linux; não se exige portabilidade fictícia. |
-| src/domain/client_queue.c | Armazenar até 100 clientes e selecionar pelo prazo absoluto, sem executar processos. |
-| src/domain/client_queue.h | Expor inserção, retirada do próximo, tamanho, capacidade e consulta de vazio. |
-| src/domain/metrics.c | Calcular satisfação e acumular contadores sem consultar diretamente o relógio. |
-| src/domain/metrics.h | Definir os contadores e as operações de registro e consulta. |
-| src/runtime/scheduler.c | Possuir descritores de threads, contextos, pilhas, fila de prontas e condições de espera. |
-| src/runtime/scheduler.h | Expor criar, ceder, esperar, despertar, executar e destruir o runtime. |
-
-### Integração com Linux
-
-| Arquivo | Responsabilidade |
-|---|---|
-| src/platform/processes.c | fork/exec, sinais, observação e recolhimento de filhos; encapsular também pselect e a máscara de sinais para aguardar eventos de filhos/entrada/interrupção. |
-| src/platform/processes.h | Expor criação e controle de filhos e eventos tipados de parada, término, entrada disponível e interrupção. |
-| src/platform/ipc.c | Criar e possuir semáforos e o bloqueio de instância; fechar e remover somente recursos próprios. |
-| src/platform/ipc.h | Expor inicialização, tentativa de aquisição, liberação e fechamento. |
-| src/platform/completion_file.c | Acrescentar registros, consumir os primeiros dez e compactar o restante sem reordenar. |
-| src/platform/completion_file.h | Expor operações sobre o arquivo e resultados de lote, sem decidir quando despertar o Analista. |
-| src/platform/terminal.c | Preparar entrada não bloqueante, permitir s sem Enter em TTY e restaurar flags e atributos originais. |
-| src/platform/terminal.h | Expor preparação, descritor de entrada, leitura de comandos e restauração idempotente. |
-| src/platform/clock.c | Obter CLOCK_MONOTONIC e converter unidades com verificação de overflow. |
-| src/platform/clock.h | Definir a representação de instantes/durações e suas operações. |
-
-### Testes
-
-| Arquivo | Responsabilidade |
-|---|---|
-| tests/domain_test.c | Capacidade, seleção, desempates, paciência e métricas com instantes artificiais. |
-| tests/scheduler_test.c | Alternância, espera, despertar, término e liberação segura de contextos. |
-| tests/integration_test.sh | Executáveis, protocolos, limites, interrupção, falhas e resíduos do sistema. |
-| tests/fixtures/controlled_client.c | Cliente exclusivo de testes, com tempos e falhas controláveis; nunca substitui o oficial na avaliação. |
-
-## 5. Dependências e interfaces
+### Limites dos módulos
 
 ```mermaid
 flowchart TD
     Main[service_main] --> App[service e workers]
-    App --> Domain[Clientes, fila e métricas]
-    App --> Runtime[Escalonador cooperativo]
-    App --> Platform[Primitivas Linux e relógio]
+    App --> Domain[clientes, fila e métricas]
+    App --> Runtime[escalonador]
+    App --> Platform[processos, IPC, arquivo, terminal e relógio]
     Analyst[analyst_main] --> Platform
 ```
 
-- O domínio não faz I/O, não lê o relógio e não conhece o runtime.
-- O runtime não conhece clientes, EDF, métricas, semáforos do protocolo ou arquivos de PIDs.
-- A plataforma não escolhe clientes nem calcula satisfação.
-- A aplicação traduz eventos da plataforma em mudanças de estado e despertares de threads.
-- O runtime recebe uma função de processamento de eventos e seu contexto, fornecidos pela aplicação. Essa função consulta eventos entre despachos e pode aguardar quando não há threads prontas. Não é necessário um barramento genérico.
-- Cabeçalhos expõem tipos e operações mínimos; helpers permanecem static na implementação. Evitar dependências circulares e acesso direto à representação privada de outro módulo.
+O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes, EDF ou o arquivo do Analista. A plataforma não decide a ordem dos clientes nem a satisfação. A aplicação liga esses módulos por interfaces pequenas e chamadas diretas; cabeçalhos não expõem a representação privada de outro módulo nem criam dependências circulares.
 
-### Dados e contratos principais
-
-| Entidade/interface | Contrato |
+| Contrato | Dados e responsabilidade |
 |---|---|
-| Configuração | N, X e caminhos internos resolvidos antes de mudar o diretório de trabalho. CLI pública: service N X. |
-| Cliente | PID, sequência, prioridade, chegada, prazo absoluto, demanda, estado e conclusão quando disponível. |
-| Fila | Guarda clientes prontos em espera; rejeita inserção cheia sem perder o registro; retirada transfere sua propriedade ao Atendente. |
-| Métricas | Contadores de criados, concluídos, satisfeitos, cancelados e falhos; cada evento terminal é registrado uma única vez. |
-| Espera do runtime | Identificador de condição, como espaço, cliente disponível, parada inicial, conclusão ou Analista parado. Verificar a condição antes de dormir e após despertar. |
-| Eventos de processos | PID, tipo de mudança e status de término/parada. Um único consumidor coleta waitpid e distribui resultados. |
-| Resultado final | Contadores, satisfação em proporção/percentual quando definida, tempo total e status de sucesso ou falha. |
+| Configuração | N, X e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
+| Cliente | PID, sequência, prioridade, chegada, prazo absoluto, demanda, estado e conclusão quando houver. |
+| Fila | Possui os clientes `QUEUED`; a retirada transfere o registro ao Atendente. Inserção cheia não descarta o cliente. |
+| Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; cada evento terminal atualiza contadores uma vez. |
+| Runtime | Thread `READY`, `RUNNING`, `WAITING` ou `FINISHED`; condições de espaço, cliente, parada inicial, conclusão e Analista parado. |
+| Processo filho | Evento com PID, tipo de mudança e status; um único consumidor recolhe os estados por `waitpid`. |
+| Resultado | Contadores, taxa quando definida, tempo total e status de sucesso ou falha. |
 
-As interfaces acima descrevem responsabilidades; assinaturas C serão definidas ao implementar a história correspondente, sem um framework de injeção de dependências.
+O runtime recebe da aplicação uma função de processamento de eventos e seu contexto. Ela consulta eventos entre despachos e pode aguardar quando nenhuma thread está pronta. As assinaturas C serão definidas ao implementar cada módulo; não há necessidade de um barramento genérico.
 
-## 6. Estados, execução e sincronização
+## Execução e sincronização
 
-### Escalonamento das threads
+### Threads, fila e eventos
 
-Estados: READY, RUNNING, WAITING e FINISHED. Cada thread tem pilha e contexto próprios. Há um contexto separado do escalonador; uma pilha nunca é liberada enquanto está em uso.
+As duas threads de usuário têm pilhas e contextos próprios. O escalonador mantém um contexto separado, despacha as prontas em round-robin e só libera a pilha após sair dela. Cada worker faz uma etapa limitada, então cede, espera ou termina. Atualizações de fila, contadores e estados não cedem no meio da operação; como handlers também não modificam esses dados, não é necessário mutex entre as threads de usuário.
 
-O round-robin considera apenas threads READY. As rotinas cedem após etapas limitadas. Fila, contadores e transições internas não contêm pontos de cessão no meio de atualizações. Como existe uma única thread de kernel e handlers não modificam essas estruturas, não há necessidade de mutex entre as duas threads de usuário.
+O Atendente seleciona o menor prazo absoluto (`chegada + paciência`); prazos iguais usam a sequência de criação. A busca linear percorre no máximo 100 registros. O atendimento já iniciado não é preemptado. Cliente vencido continua elegível: no finito todos os N devem ser atendidos; no infinito só a parada cancela os ainda não atendidos.
 
-### Eventos e esperas
+O componente de processos usa `waitpid` com `WNOHANG | WUNTRACED` e esgota os estados disponíveis. Um `SIGCHLD` indica que há trabalho a verificar, não a identidade nem a quantidade de eventos. Distinguir parada inicial, saída com status zero, saída com erro e término por sinal. A aplicação consulta esses eventos também quando há threads prontas, para que produção contínua não atrase a leitura de s ou a coleta de filhos.
 
-- A aplicação observa eventos antes de despachar novamente uma thread, evitando que trabalho contínuo impeça leitura de s ou recolhimento de filhos.
-- waitpid usa WNOHANG e WUNTRACED; esgotar todos os estados disponíveis, inclusive quando sinais se agrupam.
-- Nunca interpretar SIGCHLD isoladamente como conclusão; distinguir parada inicial, término normal e falha por PID.
-- Na ociosidade, pselect aguarda entrada e sinais. Bloquear os sinais pertinentes antes de verificar condições e usar a troca atômica de máscara durante a espera evita notificações perdidas.
-- Handlers somente registram flags sig_atomic_t e preservam errno quando necessário. Não fazem printf, alocação, manipulação da fila ou troca de contexto.
-- Não usar waitpid bloqueante, sem_wait ou sleep no caminho de espera de um worker. sem_trywait pode informar indisponibilidade; a thread só aguarda uma condição com evento de liberação definido.
-- Restaurar máscaras, disposições pertinentes e descritores antes de exec do cliente. A aplicação é responsável por todos os filhos e por fechar descritores herdados desnecessários.
-
-### Seleção dos clientes
-
-Prazo absoluto = chegada + paciência. Menor prazo primeiro, desempate por sequência. Um vetor limitado a 100 elementos permite seleção O(100), suficientemente simples para a carga prevista.
-
-O atendimento não é preemptivo. Não descartar clientes vencidos: no modo finito todos precisam ser atendidos; no infinito, apenas a parada interrompe o atendimento dos que ainda esperam. Alta prioridade não significa ultrapassar sempre toda prioridade baixa.
-
-## 7. Fluxos principais
+Quando ambas esperam, `pselect` aguarda entrada e sinais. A máscara de sinais protege a passagem entre checagem da condição e espera, evitando notificações perdidas. Handlers somente registram flags `sig_atomic_t` e preservam `errno` quando necessário; não imprimem, alocam ou trocam contextos. Workers não usam `waitpid` bloqueante, `sem_wait`, `sleep` nem leitura bloqueante. Uma tentativa `sem_trywait` pode indicar indisponibilidade e levar a uma espera do runtime com evento de liberação definido. Antes de `exec`, o filho recebe máscaras, disposições e descritores adequados, sem herdar recursos desnecessários do pai.
 
 ### Inicialização
 
-1. Validar entradas e resolver caminhos dos executáveis sem depender do diretório de execução.
-2. Iniciar a medição total, adquirir bloqueio de instância e criar diretório privado da execução.
-3. Criar os semáforos previstos, inicialmente disponíveis, e o arquivo de concluídos vazio.
-4. Criar o Analista; ele escreve analyst.pid e para com SIGSTOP. Observar essa parada antes de qualquer despertar.
-5. Preparar entrada, eventos, runtime e as duas threads. Só então iniciar a geração.
+1. Validar N/X e resolver os caminhos dos executáveis.
+2. Iniciar a medição; adquirir o bloqueio de instância e criar `run/<execution-id>/`.
+3. Criar os semáforos inicialmente disponíveis e `completed.log` vazio.
+4. Criar o Analista. Ele escreve `analyst.pid` e para com `SIGSTOP`; o pai observa essa parada antes de despertá-lo.
+5. Preparar entrada, eventos e as duas threads; iniciar a geração.
 
-O analista é filho direto do Atendimento; seu PID retornado por fork é a identidade de controle. O arquivo analyst.pid deve corresponder a ele, sem confiar em arquivos antigos.
+O Analista é filho direto do Atendimento. O PID retornado por `fork` é a identidade de controle; o conteúdo de `analyst.pid` deve corresponder a ele, nunca a um arquivo antigo.
 
 ### Recepção
 
-1. Verificar parada, limite N e capacidade; aguardar espaço sem bloquear o Atendente.
-2. Sortear prioridade com uma fonte pseudoaleatória inicializada uma vez no serviço. Cada sorteio tem probabilidade de 50%, sem forçar equilíbrio exato numa execução.
-3. Registrar chegada imediatamente antes de fork, incrementar criados somente após criação bem-sucedida e iniciar o cliente no diretório da execução.
-4. Aguardar sua parada inicial. Não criar outro cliente antes de ler e validar demanda.txt.
-5. Registrar demanda, paciência e prazo; remover a demanda temporária já consumida e inserir o cliente na fila.
-6. Notificar cliente disponível e ceder a execução.
+1. Verificar parada, limite N e espaço na fila. Sem espaço, esperar pelo runtime e manter o Atendente executável.
+2. Sortear a prioridade com uma fonte inicializada uma vez no serviço. Cada cliente tem probabilidade de 50% por classe; uma amostra não precisa conter metade exata.
+3. Reservar uma vaga para o cliente `STARTING`, registrar a chegada imediatamente antes de `fork` e iniciar o processo no diretório da execução. Contar o cliente como criado após o sucesso de `fork`.
+4. Esperar a parada inicial, ler e validar `demanda.txt`, remover o arquivo consumido e completar demanda, paciência e prazo no registro.
+5. Inserir o cliente `QUEUED`, avisar o Atendente e ceder. Criar o próximo somente após consumir a demanda anterior.
 
-Um cliente STARTING reserva uma vaga antes de sua criação. Não manter mais de 100 esperando nem criar um 101º enquanto a fila estiver cheia. Existe no máximo um STARTING; nenhuma outra criação pode sobrescrever sua demanda. A chegada inclui o custo de inicialização, não apenas o tempo após enfileirar.
+A reserva impede ultrapassar 100 clientes à espera mesmo com um `STARTING`. Um cliente `IN_SERVICE` não ocupa vaga. A medição desde a chegada inclui sua inicialização, e não começa apenas ao entrar na fila.
 
 ### Atendente
 
-1. Aguardar cliente disponível, retirar o escolhido e marcar IN_SERVICE, liberando capacidade da fila.
-2. Enviar SIGCONT apenas depois da parada inicial confirmada.
-3. Aguardar término normal do filho com status zero e capturar o instante observado, sem estimá-lo pela demanda declarada.
-4. Registrar satisfação e conclusão uma única vez.
-5. Acrescentar o PID ao arquivo, aguardando o Analista parar se ele estiver consumindo um lote.
-6. Aplicar a política de despertar e iniciar a próxima etapa.
+1. Esperar um cliente, retirá-lo por prazo e marcá-lo `IN_SERVICE`, liberando sua vaga.
+2. Enviar `SIGCONT` somente após a parada inicial confirmada.
+3. Esperar o término normal com status zero. O instante observado da conclusão é registrado antes do trabalho posterior de arquivo.
+4. Atualizar satisfação e contadores uma vez; acrescentar o PID a `completed.log` e solicitar o despertar do Analista quando cabível.
 
-O semáforo /sem_atend existe para compatibilidade com o cliente. Sua disponibilidade não prova conclusão: após SIGCONT, o filho pode ainda não tê-lo adquirido. A evidência de conclusão é o status de término recolhido.
+Há um único cliente em atendimento. `/sem_atend` existe para o protocolo do cliente, mas sua disponibilidade não comprova término: após `SIGCONT`, o filho pode ainda não tê-lo adquirido. A confirmação vem do estado recolhido do processo.
 
-### Analista e arquivo de concluídos
+### Analista e arquivo
 
-completed.log contém um PID decimal por linha, na ordem de conclusão. A proteção corresponde ao sem_block do diagrama, usando /sem_block; /sem_atend preserva o nome do cliente de referência.
+`completed.log` contém um PID decimal por linha, na ordem das conclusões. `/sem_block` protege o arquivo e `/sem_atend` preserva o nome esperado pelo cliente ilustrado.
 
-1. A thread Atendente pede o despertar; a aplicação só envia SIGCONT quando o Analista está comprovadamente parado e há registros.
-2. O Analista adquire a proteção, imprime e confirma a escrita de até dez primeiros registros, compacta o restante e libera a proteção.
-3. Volta a SIGSTOP. A observação dessa parada confirma o término do lote e permite outro despertar.
+1. O Atendente solicita o despertar; o serviço envia `SIGCONT` somente se o Analista estiver comprovadamente parado e houver PIDs pendentes.
+2. O Analista adquire a proteção, imprime e confirma a saída de até dez primeiros PIDs, remove esses registros, libera a proteção e volta a `SIGSTOP`.
+3. O serviço observa a nova parada antes de autorizar outro lote. Desperta ao chegar a dez PIDs, durante ociosidade com pendências ou ao drenar o arquivo.
 
-Enquanto o Analista está ativo, não acrescentar registros. Uma conclusão pode ficar pendente no Atendente até o retorno do Analista; não iniciar outro atendimento antes de persistir esse PID. A Recepção continua podendo avançar. Isso evita um protocolo adicional de confirmações por pipe ou memória compartilhada.
-
-Um lote com falha de saída ou arquivo resulta em erro e encerramento; nunca confirmar drenagem por mera emissão de sinal. A ordem de remoção protege a execução normal, mas não há garantia transacional exatamente-uma-vez após crash entre impressão e compactação. Não tentar recuperação automática que possa duplicar saídas.
+Não acrescentar PIDs enquanto o Analista consome um lote. Se um cliente terminar nesse intervalo, o Atendente guarda a conclusão pendente até a nova parada; a Recepção ainda pode progredir. Para 27 pendências, a drenagem precisa confirmar lotes de 10, 10 e 7 e verificar o arquivo vazio. Falha de saída ou arquivo encerra com erro; um sinal enviado não é confirmação de impressão. Não há recuperação transacional após crash entre impressão e compactação, que poderia duplicar uma saída.
 
 ### Encerramento
 
-Estados da execução: INITIALIZING → RUNNING → STOPPING → DRAINING → FINISHED. Falhas iniciam limpeza e encerram com status de erro.
+Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINISHED`; falhas entram no caminho de limpeza com status de erro.
 
-- **Finito:** parar de criar após N; continuar até todos concluírem; drenar também o lote final antes de encerrar o Analista.
-- **Infinito com s:** impedir novas criações e novos atendimentos; concluir o cliente já IN_SERVICE; cancelar os QUEUED e STARTING; registrar seu cancelamento e recolher seus processos. Um STARTING ainda não foi atendido e não precisa completar o protocolo para ser cancelado.
-- Após isso, enquanto houver registros, despertar o Analista e aguardar confirmação de cada lote. Verificar o arquivo vazio antes de removê-lo ou concluir a execução.
-- Encerrar o Analista parado com SIGTERM e SIGCONT, recolhendo-o. Clientes cancelados ainda não atendidos podem ser terminados com SIGKILL, inclusive quando parados, e sempre recolhidos.
-- Liberar recursos na ordem inversa da aquisição, restaurar o terminal, finalizar a medição e imprimir o relatório. Limpeza deve aceitar inicialização parcial e repetição sem dupla liberação.
+- **N > 0:** parar a geração após N, concluir todos, drenar também o último lote parcial e então encerrar o Analista.
+- **N = 0, comando s:** parar criações e novos atendimentos, concluir o `IN_SERVICE` atual, cancelar `QUEUED` e `STARTING` e recolher esses filhos. Cancelados não entram no denominador da satisfação.
+- **Drenagem:** despertar e esperar o Analista quantas vezes forem necessárias; confirmar cada parada e o arquivo vazio antes de finalizar.
+- **Finalização:** encerrar o Analista parado com `SIGTERM` e `SIGCONT`, recolhê-lo, liberar recursos em ordem inversa, restaurar terminal e máscaras de sinais, encerrar a medição e emitir o relatório. Clientes ainda parados que foram cancelados podem receber `SIGKILL`, seguido de recolhimento.
 
-SIGINT/SIGTERM solicitam encerramento controlado, com diagnóstico de interrupção. No modo infinito, EOF sem s na entrada solicita encerramento com erro, evitando execução sem mecanismo de parada. Entrada redirecionada aceita s como byte; apenas TTY usa termios. No modo finito, EOF desativa o monitoramento da entrada.
+`SIGINT` e `SIGTERM` solicitam limpeza controlada e diagnóstico. Em N = 0, EOF antes de s é erro para não deixar uma execução sem mecanismo de parada; no finito, EOF apenas desativa o monitoramento da entrada. Entrada redirecionada aceita o byte s; somente TTY exige alteração de `termios`.
 
-## 8. Tempos, métricas e contrato do cliente
+## Tempo, métricas e cliente de referência
 
-Guardar instantes e durações monotônicos em nanossegundos, convertendo X ms antes de calcular sua metade. Por exemplo, X = 5 ms produz paciência alta de 2,5 ms. Verificar overflow nas conversões e somas.
+Guardar instantes monotônicos em nanossegundos. Converter X ms antes de dividir por dois, preservando, por exemplo, 2,5 ms quando X = 5. Verificar overflow em conversões e somas.
 
-| Medida | Definição |
+| Medida | Regra |
 |---|---|
-| Resposta | Conclusão observada menos chegada registrada. |
-| Satisfeito | Resposta ≤ paciência, inclusive igualdade exata. |
-| Taxa finita | Satisfeitos / N, apenas após conclusão bem-sucedida dos N. |
-| Taxa infinita | Satisfeitos / concluídos; cancelados e ainda não atendidos não entram no denominador. |
-| Nenhum concluído | Taxa não aplicável; mostrar concluídos = 0, sem dividir por zero. |
-| Tempo total | Da inicialização antes de recursos/filhos até terminar drenagem e limpeza, imediatamente antes do relatório. |
+| Resposta | Conclusão observada menos chegada registrada. Inclui a latência de observação do pai; não é inferida da demanda. |
+| Satisfação | Resposta menor ou igual à paciência, inclusive igualdade exata. |
+| Taxa finita | Satisfeitos/N após sucesso com N concluídos. |
+| Taxa infinita | Satisfeitos/concluídos; cancelar clientes não aumenta o denominador. |
+| Zero concluídos | Taxa não aplicável, com contador zero; sem divisão por zero. |
+| Tempo total | Da inicialização antes dos recursos/filhos até o fim da drenagem e limpeza, imediatamente antes do relatório. |
 
-A latência entre o término real do cliente e sua observação integra a medição. Não usar timestamp artificial inferido do tempo de serviço. Processar eventos com frequência reduz essa latência sem mascará-la.
+O cliente ilustrado no PDF determina estes pontos de integração:
 
-Particularidades P do cliente de referência:
+| ID | Comportamento observado |
+|---|---|
+| P01 | Escreve `demanda.txt` e depois chama `raise(SIGSTOP)`. Ler a demanda somente após observar a parada. |
+| P02 | Depois de `SIGCONT`, abre `/sem_atend` e usa o semáforo durante seu atendimento. |
+| P03 | Passa a demanda diretamente a `usleep`, em **microssegundos**; X permanece em **milissegundos**. Não alterar unidades para aproximá-las. |
+| P04 | Usa `srand(time(NULL))`; clientes próximos podem gerar demandas iguais. Não mudar a fonte oficial por esse motivo. |
+| P05 | A versão do PDF é referência. Conferir o arquivo oficial, quando disponível, e documentar qualquer diferença antes de adaptar o serviço. |
 
-- **P01:** escreve demanda.txt antes de raise(SIGSTOP); somente depois deve ser enfileirado.
-- **P02:** usa o semáforo nomeado /sem_atend após retomar; o serviço o prepara antes da criação.
-- **P03:** a demanda é passada diretamente a usleep e está em microssegundos nessa versão, enquanto X está em milissegundos. Não multiplicar a carga nem alterar o fonte para aproximar unidades.
-- **P04:** a geração interna de demanda usa srand/time; clientes próximos podem produzir demandas iguais. Não corrigir essa característica alterando o cliente oficial.
-- **P05:** o cliente oficial ainda precisa ser conferido com a versão ilustrada no PDF. Divergências devem ser documentadas antes de alterar o adaptador.
-
-## 9. Propriedade, falhas e limites
+## Propriedade dos recursos e falhas
 
 | Recurso | Proprietário e liberação |
 |---|---|
-| Estado da execução e registros de clientes | service; a fila possui os QUEUED, o Atendente o IN_SERVICE; liberar cada registro após registro terminal e coleta do filho. |
-| Pilhas e descritores de threads | scheduler; destruir a partir do contexto do escalonador. |
-| Processos filhos | Atendimento; processes concentra a coleta e não deixa workers competirem por waitpid. |
-| Semáforos | Atendimento cria com identificação de propriedade e remove apenas os que criou; Analista e cliente usam os necessários. |
-| Proteção de instância | Atendimento mantém um lock de arquivo no sistema durante toda a execução, por exemplo /tmp/service-simulator-<uid>.lock; não apagar o inode do lock enquanto outras instâncias puderem usá-lo. |
-| Arquivos | A execução usa diretório próprio; Atendimento acrescenta PIDs e Analista remove registros impressos sob proteção. |
-| Terminal e máscaras de sinais | Salvar antes de modificar e restaurar em todos os caminhos controlados. |
+| Registros de clientes | `service`: Recepção cria, fila possui `QUEUED`, Atendente possui `IN_SERVICE`; liberar após o estado terminal e a coleta do filho. |
+| Pilhas e contextos | `scheduler`; liberar a pilha somente a partir do contexto do escalonador. |
+| Processos | Atendimento; `processes` concentra a coleta, inclusive de filhos cancelados ou parados. |
+| Semáforos | Atendimento cria, fecha e remove somente os que possui; cliente e Analista acessam os previstos. |
+| Bloqueio de instância | Atendimento mantém um lock durante toda a execução, por exemplo `/tmp/service-simulator-<uid>.lock`; não apagar seu inode enquanto outra instância puder usá-lo. |
+| Arquivos da execução | Atendimento prepara e inclui PIDs; Analista consome o prefixo sob proteção. `run/` fica fora do Git. |
+| Terminal e sinais | Salvar configuração antes de alterá-la e restaurar em todos os caminhos controlados. |
 
-Falha de fork/exec, cliente com saída por sinal ou status diferente de zero, demanda inválida, erro de semáforo, Analista morto ou erro de arquivo/saída interrompem a execução normal. Emitir diagnóstico em stderr e limpar recursos; não ignorar clientes para alegar que N terminou. Resultado parcial deve ser identificado como tal e acompanhar status de erro.
+Erros de `fork`/`exec`, saída do cliente por sinal ou com status diferente de zero, demanda inválida, semáforo indisponível, morte do Analista ou falha de arquivo/saída encerram a execução com diagnóstico em `stderr` e status de erro. Não apresentar um finito incompleto como sucesso; identificar qualquer resultado parcial. A limpeza deve aceitar inicialização parcial e repetição sem dupla liberação.
 
-Se um semáforo fixo já existir, falhar com diagnóstico; não apagar recursos de outra execução. SIGKILL ou queda do sistema podem deixar resíduos: não prometer limpeza nesses casos nem adicionar recuperação destrutiva automática. Nenhum requisito garante término de um cliente defeituoso; os testes de integração usarão um watchdog externo, sem alterar a satisfação ou inventar timeout de atendimento.
+Se um semáforo fixo já existir, falhar com diagnóstico em vez de remover um recurso alheio. `SIGKILL` ou queda do sistema podem deixar resíduos; não há limpeza garantida nesses casos nem recuperação automática destrutiva. Um cliente defeituoso pode não terminar: testes usam watchdog **externo**, sem introduzir timeout de atendimento no produto.
 
-Guardar completed.log vazio ao término normal como evidência local é permitido; no erro, preservar pendências com diagnóstico. Arquivos temporários de demanda e analyst.pid devem ser limpos quando seguro. Todo run/ permanece ignorado pelo Git.
+Ao terminar normalmente, `completed.log` pode permanecer vazio como evidência local; após erro, preservar pendências com diagnóstico. Remover `demanda.txt` consumido e `analyst.pid` quando for seguro. Liberar apenas recursos pertencentes à execução.
 
-## 10. Verificação e desenvolvimento
+## Verificação e desenvolvimento
 
-As histórias, dependências, passos e matriz de cobertura estão em [user-stories.md](user-stories.md). A implementação seguirá domínio → runtime → processos/IPC → arquivo/Analista → integração → encerramento → entrega e medição. As primeiras quatro áreas podem ser verificadas isoladamente com dados e clientes controlados.
+Desenvolver domínio, runtime, processos/IPC e Analista com testes isolados; depois integrar atendimento, encerramento e avaliação. A [matriz de histórias](user-stories.md#matriz-de-rastreabilidade) relaciona cada requisito a testes e cenários de aceite.
 
-Verificações obrigatórias incluem N = 1, N > 100, N = 0, X ímpar, limites exatos de satisfação, fila cheia, demandas serializadas, lotes de 1/10/11/27, s em diferentes estados, erro parcial e ausência de filhos zumbis/sobreviventes após limpeza controlada.
+Cobrir N = 1, N > 100 e N = 0; X ímpar; igualdade e ultrapassagem da paciência; fila cheia; demanda serializada; lotes de 1, 10, 11 e 27; s nos diferentes estados; falhas parciais; restauração do terminal e recolhimento de filhos. Compilar código próprio com avisos fortes. Ferramentas de memória podem ter limitações com `ucontext`; ThreadSanitizer isoladamente não demonstra a correção do escalonador.
 
-Compilar com avisos fortes no código próprio. Usar ferramentas de memória quando compatíveis com ucontext, registrando suas limitações; ThreadSanitizer não é prova de correção de um runtime cooperativo baseado em contextos. Não alterar o cliente oficial para eliminar avisos do código fornecido.
+Medições de desempenho devem registrar ambiente, carga e número de repetições. O cliente controlado fornece cenários reproduzíveis; o oficial demonstra compatibilidade real sem promessa de sequência aleatória repetível. Melhorias de desempenho não podem alterar a carga ou a fórmula de satisfação.
 
-Comparar desempenho com as mesmas condições e várias repetições. Cenários controlados servem à comparação reprodutível; execuções do cliente oficial servem à compatibilidade e avaliação real. Não prometer distribuição de demanda reproduzível alterando o código do professor.
+## Referências técnicas
 
-## 11. Referências técnicas
-
-As referências explicam mecanismos, sem acrescentar requisitos ao trabalho:
-
-- [makecontext e swapcontext](https://man7.org/linux/man-pages/man3/swapcontext.3.html): contextos, pilhas e limites de portabilidade.
-- [waitpid](https://man7.org/linux/man-pages/man2/waitpid.2.html): parada, término, WNOHANG, WUNTRACED e recolhimento.
-- [Segurança em handlers](https://man7.org/linux/man-pages/man7/signal-safety.7.html): operações permitidas em contexto de sinal.
-- [pselect](https://man7.org/linux/man-pages/man2/select.2.html): espera e troca atômica de máscara; o projeto monitora poucos descritores.
-- [sem_wait e sem_trywait](https://man7.org/linux/man-pages/man3/sem_wait.3.html): distinção entre espera bloqueante e tentativa imediata.
+- [makecontext e swapcontext](https://man7.org/linux/man-pages/man3/swapcontext.3.html): contextos e pilhas.
+- [waitpid](https://man7.org/linux/man-pages/man2/waitpid.2.html): estados e recolhimento de filhos.
+- [Segurança em handlers](https://man7.org/linux/man-pages/man7/signal-safety.7.html): funções seguras em contexto de sinal.
+- [pselect](https://man7.org/linux/man-pages/man2/select.2.html): espera com troca atômica de máscara.
+- [sem_wait e sem_trywait](https://man7.org/linux/man-pages/man3/sem_wait.3.html): espera bloqueante e tentativa imediata.
 - [clock_gettime](https://man7.org/linux/man-pages/man2/clock_gettime.2.html): relógio monotônico.
 
-O texto geral proíbe bibliotecas auxiliares de IPC/paralelismo, enquanto o próprio anexo usa semáforos POSIX. A interpretação adotada permite essas primitivas explícitas e a libc, sem delegar o escalonamento a bibliotecas de threads. Uma orientação posterior do professor deve ser registrada e refletida nos três documentos antes de mudar essa interpretação.
+O texto proíbe bibliotecas auxiliares de IPC/paralelismo, enquanto o anexo usa semáforos POSIX. Esta arquitetura interpreta as primitivas POSIX e a libc como permitidas e mantém o escalonador no código do projeto. Caso o professor oriente outra interpretação, registre a mudança na arquitetura, nas histórias e nas instruções antes de aplicá-la.
