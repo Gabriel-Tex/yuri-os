@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. O registro do cliente (US01) e a fila limitada (US02) estão implementados com testes de domínio. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02) e métricas com conversão de tempo (US03) estão implementados com testes determinísticos. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -151,7 +151,7 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 | Configuração | N, X e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
 | Cliente | PID, sequência, prioridade, chegada, paciência, prazo absoluto, demanda, estado e conclusão quando houver. |
 | Fila | Possui até 100 clientes `QUEUED` ou 99 mais uma reserva `STARTING`; a retirada transfere o registro ao Atendente. Inserção inválida não descarta o cliente. |
-| Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; cada evento terminal atualiza contadores uma vez. |
+| Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; as operações terminais mudam estado e contadores juntas, uma vez por registro. |
 | Runtime | Thread `READY`, `RUNNING`, `WAITING` ou `FINISHED`; condições de espaço, cliente, parada inicial, conclusão e Analista parado. |
 | Processo filho | Evento com PID, tipo de mudança e status; um único consumidor recolhe os estados por `waitpid`. |
 | Resultado | Contadores, taxa quando definida, tempo total e status de sucesso ou falha. |
@@ -250,6 +250,12 @@ Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINI
 ## Tempo, métricas e cliente de referência
 
 Guardar instantes monotônicos em nanossegundos. Converter X ms antes de dividir por dois, preservando, por exemplo, 2,5 ms quando X = 5. Verificar overflow em conversões e somas.
+
+`platform/clock` lê `CLOCK_MONOTONIC` e converte `timespec` para nanossegundos com validação de segundos, fração e overflow. O cálculo puro de duração exige fim maior ou igual ao início; o tempo total será obtido pela aplicação ao final da limpeza. O domínio recebe apenas instantes numéricos e não consulta o relógio. Falhas de conversão ou leitura preservam a saída e permitem ao chamador examinar `errno`.
+
+`metrics_record_created` incrementa criados após cada `fork` bem-sucedido. Para cada registro ativo, a aplicação usa uma das operações `metrics_record_completed`, `metrics_record_cancelled` ou `metrics_record_failed`; elas fazem a transição da US01 e incrementam o contador correspondente sem ceder execução. Não chamar separadamente `client_complete`, `client_cancel` ou `client_fail` para o mesmo evento. As operações recusam estado inválido, ausência de cliente criado ainda sem evento terminal e overflow, preservando registro e contadores. O chamador fornece a conclusão observada após confirmar a saída normal do processo; nenhuma demanda estimada substitui esse instante.
+
+A resposta usa subtração sem sinal `conclusão - chegada` somente depois de confirmar que a conclusão não antecede a chegada. `metrics_finite_rate` só produz taxa quando `criados = concluídos = N > 0`, sem cancelados nem falhos. `metrics_infinite_rate` divide satisfeitos por concluídos e deixa a taxa não aplicável quando não há concluídos. Ambos retornam `false` sem alterar a saída quando a taxa não se aplica. A aplicação continua responsável por tratar falhas de execução como erro, mesmo se houver atendimentos concluídos no modo infinito.
 
 | Medida | Regra |
 |---|---|

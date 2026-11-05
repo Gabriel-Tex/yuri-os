@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01 e US02 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US03 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -59,6 +59,8 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 ### US03 — Calcular satisfação e métricas
 
 **Tipo:** técnico · **Depende de:** US01 · **Cobre:** R05–R08, R18; D11.
+
+**Estado:** concluída em 2026-11-05. Contadores e taxas em `src/domain/metrics.{h,c}`; relógio e conversões em `src/platform/clock.{h,c}`. Quatro grupos de testes usam instantes artificiais e estão registrados em [verification.md](verification.md#us03--satisfação-e-métricas). A coleta real de chegada e conclusão e o relatório pertencem às histórias de integração.
 
 **Entrega:** contadores de criados, concluídos, satisfeitos, cancelados e falhos, com taxas para N finito e infinito.
 
@@ -420,7 +422,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01 e US02. Há compilação dos testes de domínio, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01–US03. Há compilação dos testes de domínio e conversão, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

@@ -34,3 +34,15 @@ Data: 2026-11-05. Ambiente: Linux x86_64; código próprio compilado em C17 com 
 `tests/client_queue_test.c` usa registros e prazos artificiais para verificar fila vazia e unitária; reserva para `STARTING`; recusa de inserção incompleta; limite de 100 considerando a reserva; recusa da 101ª; liberação e reocupação após retirada; liberação da reserva após falha; seleção por prazo e desempate por sequência mesmo com inserção em ordem inversa; cliente de prazo vencido ainda elegível; ponteiros nulos e inserção sem reserva. A retirada devolve um registro `QUEUED`, e o teste o transfere a `IN_SERVICE` fora da fila.
 
 O teste não mede desempenho nem usa relógio real, processos ou IPC. A pausa e a retomada da Recepção ao atingir 100 aguardam a integração dos eventos nas US06/US14; R15 está verificado aqui apenas como limite de capacidade. Não há medição de satisfação ou tempo total do produto nesta história.
+
+## US03 — Satisfação e métricas
+
+Data: 2026-11-05. Ambiente: Linux x86_64; compilação C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `make test` | US01 (cinco grupos), US02 (quatro) e US03 (quatro) passaram; compilação dos novos módulos sem avisos. |
+
+`tests/metrics_test.c` verifica prioridade alta com X = 5 ms e limite de 2,5 ms, igualdade e ultrapassagem por 1 ns, prioridade baixa com X ms, evento terminal repetido, cancelamento excluído do denominador infinito, finito incompleto ou falho recusado, zero concluídos, saída de taxa inalterada em erro, limites de contadores e conversões de `timespec` e duração, incluindo overflow. Os casos usam somente instantes fornecidos pelo teste; a função que lê o relógio real é compilada, mas não chamada no teste determinístico.
+
+Captura real da chegada, coleta da conclusão, confirmação de status do cliente e medição do tempo total dependem da aplicação e dos processos. Não há medição de satisfação nem de tempo total do produto nesta etapa.
