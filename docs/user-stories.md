@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01 está concluída; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01 e US02 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -39,6 +39,8 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 **Tipo:** técnico · **Depende de:** US01 · **Cobre:** R13, R15; D05–D07.
 
+**Estado:** concluída em 2026-11-05. Fila e reserva em `src/domain/client_queue.{h,c}`, com quatro grupos de testes determinísticos em `tests/client_queue_test.c`. O uso dos eventos de vaga e cliente disponível pela aplicação pertence às US06 e US14; comandos e limites da verificação estão no [registro](verification.md#us02--fila-limitada-e-seleção-edf).
+
 **Entrega:** fila de 100 vagas com reserva para o cliente em inicialização e seleção pelo menor prazo absoluto, desempatada pela ordem de criação.
 
 **Aceite:**
@@ -49,7 +51,7 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 **Passos:**
 
 1. Implementar vetor limitado e interface de capacidade, inserção e retirada em `client_queue.{h,c}`.
-2. Definir a reserva de capacidade no contexto da aplicação sem enfileirar cliente incompleto.
+2. Definir a reserva de capacidade na fila; a Recepção manterá o registro `STARTING` em seu contexto até completar a demanda, sem enfileirá-lo incompleto.
 3. Testar 0, 1, 100 e 101 reservas; ordem, empate, vencimento e reocupação após retirada.
 
 **Verificação:** seleção linear sobre dados sintéticos; não exigir preferência absoluta por alta prioridade.
@@ -418,7 +420,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte à US01. Há compilação do teste de domínio, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01 e US02. Há compilação dos testes de domínio, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

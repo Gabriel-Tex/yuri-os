@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. O registro do cliente e suas transições estão implementados na US01, com compilação mínima e testes de domínio. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. O registro do cliente (US01) e a fila limitada (US02) estão implementados com testes de domínio. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -150,7 +150,7 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 |---|---|
 | Configuração | N, X e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
 | Cliente | PID, sequência, prioridade, chegada, paciência, prazo absoluto, demanda, estado e conclusão quando houver. |
-| Fila | Possui os clientes `QUEUED`; a retirada transfere o registro ao Atendente. Inserção cheia não descarta o cliente. |
+| Fila | Possui até 100 clientes `QUEUED` ou 99 mais uma reserva `STARTING`; a retirada transfere o registro ao Atendente. Inserção inválida não descarta o cliente. |
 | Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; cada evento terminal atualiza contadores uma vez. |
 | Runtime | Thread `READY`, `RUNNING`, `WAITING` ou `FINISHED`; condições de espaço, cliente, parada inicial, conclusão e Analista parado. |
 | Processo filho | Evento com PID, tipo de mudança e status; um único consumidor recolhe os estados por `waitpid`. |
@@ -176,6 +176,14 @@ O runtime recebe da aplicação uma função de processamento de eventos e seu c
 As operações retornam `bool`: ponteiro nulo, transição inválida ou instante de conclusão anterior à chegada são recusados sem alterar o registro. Estados terminais não permitem novas transições, inclusive repetição do mesmo evento. Esses contratos evitam registrar duas conclusões ou cancelamentos no mesmo registro; contabilização pertence à US03. A aplicação deve transferir a propriedade sem manter cópias ativas independentes.
 
 A demanda só é válida após `client_enqueue`; zero e todo o intervalo de `uint64_t` são representáveis, sem converter unidades ou simular serviço. `completion_ns` só é válido em `COMPLETED`. Concluir após o prazo é permitido; satisfação será calculada nas métricas. As funções não enviam sinais, confirmam saída de processos nem liberam recursos: a aplicação só libera o registro após recolher o filho.
+
+### Fila limitada — US02
+
+`struct client_queue` guarda até 100 registros `QUEUED` em um vetor e um indicador de reserva. A Recepção mantém o registro `STARTING` em seu próprio contexto, fora do vetor: `client_queue_reserve` ocupa uma vaga antes da criação e `client_queue_insert` só aceita o registro após a leitura da demanda e a transição para `QUEUED`. A inserção consome a reserva. Se a inicialização do cliente falhar ou for cancelada, `client_queue_release_reservation` a devolve. Só há uma reserva por vez, de acordo com D07.
+
+`client_queue_waiting_count` inclui registros enfileirados e a reserva. `client_queue_has_space` indica se uma nova reserva é possível; com 100 esperas, a Recepção deve aguardar um evento de vaga do runtime (US06/US14). Uma tentativa de reserva cheia ou inserção inválida retorna `false` sem alterar a fila nem o registro do chamador. A aplicação é responsável por não manter outra cópia ativa após inserir e por notificar o Atendente sobre a disponibilidade de cliente.
+
+`client_queue_take_next` copia para o destino externo o registro com menor `deadline_ns`; em empate, usa menor `sequence`. A aplicação atribui sequências únicas, portanto não há contrato de ordem para sequências iguais. A retirada libera a vaga antes de o Atendente marcar o registro `IN_SERVICE`; a aplicação deve notificar a Recepção. Um prazo já vencido não retira o cliente da seleção. A busca e a remoção percorrem no máximo 100 entradas, e a remoção preenche o buraco com o último elemento. Esse vetor não consulta relógio, processos ou sinais.
 
 ## Execução e sincronização
 
