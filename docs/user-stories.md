@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). Nenhuma história está implementada nesta fase.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01 está concluída; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -18,6 +18,8 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 **Tipo:** técnico · **Depende de:** nada · **Cobre:** R05, R13; D11.
 
+**Estado:** concluída em 2026-10-22. Registro e transições em `src/domain/client.{h,c}`, com cinco grupos de testes determinísticos em `tests/domain_test.c`. Comandos e limites da verificação estão no [registro](verification.md#us01--registro-e-estados-do-cliente).
+
 **Entrega:** um registro com PID, sequência, prioridade, chegada, demanda, prazo e estado. Estados: `STARTING`, `QUEUED`, `IN_SERVICE`, `COMPLETED`, `CANCELLED` e `FAILED`.
 
 **Aceite:**
@@ -27,7 +29,7 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 **Passos:**
 
-1. Definir campos, estados e unidades em `src/domain/client.h`.
+1. Definir campos, estados e unidades em `src/domain/client.h` e operações verificadas em `src/domain/client.c`.
 2. Documentar transições e transferência de propriedade entre Recepção, fila e Atendente.
 3. Adicionar casos de prioridades, estados, X par/ímpar e limites em `tests/domain_test.c`.
 
@@ -415,6 +417,8 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 ### US20 — Padronizar construção e execução
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
+
+**Estado:** iniciada como suporte à US01. Há compilação do teste de domínio, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

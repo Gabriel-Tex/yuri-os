@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. O repositório ainda está na fase de documentação; a estrutura de código abaixo descreve a implementação prevista. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções para quem for desenvolvê-la.
+Esta arquitetura cobre a primeira parte do trabalho prático. O registro do cliente e suas transições estão implementados na US01, com compilação mínima e testes de domínio. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -50,12 +50,13 @@ O PDF ilustra o cliente, mas o ZIP não contém um arquivo `client.c` independen
 | D07 | No máximo um cliente em inicialização e um em atendimento. | Proteger a demanda compartilhada e representar o único Atendente. |
 | D08 | Ao receber s, concluir o atendimento atual, cancelar os demais e drenar os PIDs. | Definir um encerramento verificável e o denominador da taxa. |
 | D09 | Dados em `run/<execution-id>/` e somente uma instância ativa. | Isolar arquivos locais enquanto o cliente usa semáforo de nome global. |
-| D10 | Preservar `demanda.txt` como exceção aos nomes em inglês. | Compatibilidade literal com o cliente fornecido. |
 | D11 | Tempo monotônico em nanossegundos; conclusão no instante observado pelo pai. | Preservar X/2 quando X for ímpar e evitar saltos do relógio civil. |
 | D12 | Despertar o Analista com dez PIDs, na ociosidade com pendências ou na drenagem. | Escoar o arquivo sem exigir impressão após cada atendimento. |
 | D13 | Aceitar N inteiro não negativo e X inteiro positivo em ms; rejeitar conversão com overflow. | Definir uma CLI sem cálculos inválidos; rejeitar X = 0 é decisão de validação. |
 
 O limite de 100 no modo finito, EDF, C17 e a drenagem finita são decisões do projeto. O enunciado não exige essas escolhas específicas. EDF seleciona pelo prazo, mas não garante satisfação ótima em toda carga.
+
+Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo total de execução. Decisões de projeto podem ser revistas para esses objetivos, com atualização dos contratos e testes afetados, sem contrariar requisitos ou alterar o cliente oficial e as medições. Ganhos de desempenho exigem evidência em condições equivalentes; a US01 não altera a política de seleção.
 
 ## Estrutura prevista
 
@@ -77,7 +78,7 @@ O limite de 100 no modo finito, EDF, C17 e a drenagem finita são decisões do p
 │   ├── service_main.c
 │   ├── analyst_main.c
 │   ├── domain/
-│   │   ├── client.h
+│   │   ├── client.{h,c}
 │   │   ├── client_queue.{h,c}
 │   │   └── metrics.{h,c}
 │   ├── app/
@@ -116,7 +117,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `provided/client.c` | Preservar a fonte oficial quando recebida ou conferida; não usar a fixture de teste como substituta. |
 | `src/service_main.c` | Validar `N` e `X`, iniciar o serviço e apresentar o relatório. |
 | `src/analyst_main.c` | Executar a parada inicial e um lote por despertar do Analista. |
-| `src/domain/client.h` | Definir dados, prioridade e estados do cliente. O uso de `pid_t` é compatível com o alvo Linux. |
+| `src/domain/client.h` / `.c` | Definir registro, unidades e transições verificadas do cliente, sem I/O ou processos. O uso de `pid_t` é compatível com o alvo Linux. |
 | `src/domain/client_queue.h` / `.c` | Expor e implementar reserva, inserção, capacidade e seleção EDF da fila. |
 | `src/domain/metrics.h` / `.c` | Expor e implementar contadores, satisfação e taxa com instantes fornecidos pela aplicação. |
 | `src/app/service.h` / `.c` | Definir configuração/resultado e coordenar eventos, recursos, estado da execução e finalização. |
@@ -148,7 +149,7 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 | Contrato | Dados e responsabilidade |
 |---|---|
 | Configuração | N, X e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
-| Cliente | PID, sequência, prioridade, chegada, prazo absoluto, demanda, estado e conclusão quando houver. |
+| Cliente | PID, sequência, prioridade, chegada, paciência, prazo absoluto, demanda, estado e conclusão quando houver. |
 | Fila | Possui os clientes `QUEUED`; a retirada transfere o registro ao Atendente. Inserção cheia não descarta o cliente. |
 | Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; cada evento terminal atualiza contadores uma vez. |
 | Runtime | Thread `READY`, `RUNNING`, `WAITING` ou `FINISHED`; condições de espaço, cliente, parada inicial, conclusão e Analista parado. |
@@ -156,6 +157,25 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 | Resultado | Contadores, taxa quando definida, tempo total e status de sucesso ou falha. |
 
 O runtime recebe da aplicação uma função de processamento de eventos e seu contexto. Ela consulta eventos entre despachos e pode aguardar quando nenhuma thread está pronta. As assinaturas C serão definidas ao implementar cada módulo; não há necessidade de um barramento genérico.
+
+### Registro do cliente — US01
+
+`struct client_record`, em `domain/client.h`, é um registro por valor, sem alocação ou recurso próprio. PID usa `pid_t`; sequência, demanda e tempos usam `uint64_t`. Chegada, paciência, prazo absoluto e conclusão estão em nanossegundos; demanda está em microssegundos. A aplicação fornece chegada relativa ao início da execução no momento da criação; nenhuma transição a altera.
+
+`client_init` exige PID positivo, prioridade válida e X positivo em milissegundos. Primeiro converte X para nanossegundos, depois divide por dois para prioridade alta e soma a chegada. Recusa conversão ou soma que ultrapasse `UINT64_MAX`, mantendo o destino intacto. O maior X aceito é `UINT64_MAX / 1000000` ms (18.446.744.073.709 ms); a chegada ainda precisa permitir a soma. Sequência zero é válida; unicidade e ordem são responsabilidade da aplicação.
+
+| Operação | Transição | Contrato e propriedade |
+|---|---|---|
+| `client_init` | Armazenamento disponível → `STARTING` | Recepção possui o registro após a criação; não reinicializar um cliente ainda sob responsabilidade do serviço. |
+| `client_enqueue` | `STARTING` → `QUEUED` | Recebe demanda já lida e validada pela plataforma; transfere o registro da Recepção para a fila. |
+| `client_start` | `QUEUED` → `IN_SERVICE` | Retirada transfere o registro da fila ao Atendente. |
+| `client_complete` | `IN_SERVICE` → `COMPLETED` | Recebe instante de conclusão maior ou igual à chegada, após confirmação externa de saída normal. |
+| `client_cancel` | `STARTING` ou `QUEUED` → `CANCELLED` | Serviço assume cancelamento e recolhimento; atendimento em andamento deve terminar. |
+| `client_fail` | Qualquer não terminal → `FAILED` | Serviço assume tratamento do erro e recolhimento. |
+
+As operações retornam `bool`: ponteiro nulo, transição inválida ou instante de conclusão anterior à chegada são recusados sem alterar o registro. Estados terminais não permitem novas transições, inclusive repetição do mesmo evento. Esses contratos evitam registrar duas conclusões ou cancelamentos no mesmo registro; contabilização pertence à US03. A aplicação deve transferir a propriedade sem manter cópias ativas independentes.
+
+A demanda só é válida após `client_enqueue`; zero e todo o intervalo de `uint64_t` são representáveis, sem converter unidades ou simular serviço. `completion_ns` só é válido em `COMPLETED`. Concluir após o prazo é permitido; satisfação será calculada nas métricas. As funções não enviam sinais, confirmam saída de processos nem liberam recursos: a aplicação só libera o registro após recolher o filho.
 
 ## Execução e sincronização
 
