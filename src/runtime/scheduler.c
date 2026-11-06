@@ -141,7 +141,9 @@ bool scheduler_resume(struct scheduler *scheduler, size_t index)
     return true;
 }
 
-bool scheduler_run(struct scheduler *scheduler)
+bool scheduler_run_events(struct scheduler *scheduler,
+                          scheduler_event_callback process,
+                          scheduler_event_callback wait, void *context)
 {
     if (scheduler == NULL || !scheduler->initialized || scheduler_active != NULL)
     {
@@ -158,22 +160,44 @@ bool scheduler_run(struct scheduler *scheduler)
         errno = EINVAL;
         return false;
     }
-    while (scheduler->ready_count > 0)
+    for (;;)
     {
-        if (!scheduler_resume(scheduler, scheduler->ready_queue[0]))
+        if (process != NULL && !process(context))
         {
             return false;
         }
-    }
-    for (size_t i = 0; i < SCHEDULER_THREAD_COUNT; i++)
-    {
-        if (scheduler->threads[i].state == SCHEDULER_WAITING)
+        if (scheduler->ready_count > 0)
+        {
+            if (!scheduler_resume(scheduler, scheduler->ready_queue[0]))
+            {
+                return false;
+            }
+            continue;
+        }
+        bool has_waiting = false;
+        for (size_t i = 0; i < SCHEDULER_THREAD_COUNT; i++)
+        {
+            has_waiting |= scheduler->threads[i].state == SCHEDULER_WAITING;
+        }
+        if (!has_waiting)
+        {
+            return true;
+        }
+        if (wait == NULL)
         {
             errno = EAGAIN;
             return false;
         }
+        if (!wait(context))
+        {
+            return false;
+        }
     }
-    return true;
+}
+
+bool scheduler_run(struct scheduler *scheduler)
+{
+    return scheduler_run_events(scheduler, NULL, NULL, NULL);
 }
 
 bool scheduler_yield(void)
@@ -199,6 +223,68 @@ bool scheduler_yield(void)
         return false;
     }
     return true;
+}
+
+bool scheduler_wait(struct scheduler *scheduler, unsigned int event_id,
+                    scheduler_condition condition, void *context)
+{
+    if (scheduler == NULL || scheduler_active != scheduler ||
+        scheduler->running_index >= SCHEDULER_THREAD_COUNT ||
+        event_id == SCHEDULER_NO_EVENT || condition == NULL)
+    {
+        errno = EINVAL;
+        return false;
+    }
+    struct scheduler_thread *thread = &scheduler->threads[scheduler->running_index];
+    if (thread->state != SCHEDULER_RUNNING)
+    {
+        errno = EINVAL;
+        return false;
+    }
+    while (!condition(context))
+    {
+        /* Um sinal pode alterar uma condição entre a primeira leitura e a
+         * suspensão; neste caso a rotina continua sem perder o evento. */
+        if (condition(context))
+        {
+            break;
+        }
+        thread->wait_event = event_id;
+        thread->state = SCHEDULER_WAITING;
+        if (swapcontext(&thread->context, &scheduler->dispatcher_context) == -1)
+        {
+            int saved_errno = errno;
+            thread->wait_event = SCHEDULER_NO_EVENT;
+            thread->state = SCHEDULER_RUNNING;
+            errno = saved_errno;
+            return false;
+        }
+    }
+    return true;
+}
+
+int scheduler_notify(struct scheduler *scheduler, unsigned int event_id)
+{
+    if (scheduler == NULL || !scheduler->initialized ||
+        event_id == SCHEDULER_NO_EVENT ||
+        (scheduler_active != NULL && scheduler_active != scheduler))
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    int woken = 0;
+    for (size_t i = 0; i < SCHEDULER_THREAD_COUNT; i++)
+    {
+        struct scheduler_thread *thread = &scheduler->threads[i];
+        if (thread->state == SCHEDULER_WAITING && thread->wait_event == event_id)
+        {
+            thread->wait_event = SCHEDULER_NO_EVENT;
+            thread->state = SCHEDULER_READY;
+            scheduler_enqueue(scheduler, i);
+            woken++;
+        }
+    }
+    return woken;
 }
 
 enum scheduler_thread_state scheduler_state(const struct scheduler *scheduler,
@@ -231,6 +317,7 @@ bool scheduler_destroy(struct scheduler *scheduler)
             scheduler->threads[i].stack = NULL;
         }
         scheduler->threads[i].state = SCHEDULER_EMPTY;
+        scheduler->threads[i].wait_event = SCHEDULER_NO_EVENT;
     }
     scheduler->ready_count = 0;
     scheduler->running_index = SCHEDULER_THREAD_COUNT;

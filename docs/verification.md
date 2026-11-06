@@ -72,3 +72,17 @@ Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio compilado em C1
 `scheduler_test.c` verifica alternância automática das duas rotinas pela sequência observada, com cada uma terminando primeiro em cenários distintos. Também verifica execução de uma única rotina criada, estado `RUNNING` exclusivo durante cada etapa, recusa de reentrada em `scheduler_run`, ausência de novo despacho após `FINISHED` e repetição de `scheduler_run` sem executar rotinas terminadas. As sequências usam somente cessões explícitas, sem relógio de parede.
 
 O estado `WAITING` ainda não tem transição pública: espera, despertar e processamento de eventos pertencem à US06. Não há clientes, processos ou medição de desempenho do serviço nesta verificação. As limitações de ferramentas de memória para `ucontext` descritas na US04 permanecem.
+
+## US06 — Espera e despertar por condição
+
+Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio compilado em C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 10s make test` | Os quatro testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 20s make debug` | Os quatro testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `git diff --check` | Sem erros de whitespace nas alterações rastreadas. |
+
+`scheduler_test.c` usa eventos artificiais para verificar duas rotinas esperando o mesmo evento e acordadas juntas; identificadores distintos; notificação anterior à espera; condição que muda entre duas leituras antes da suspensão; notificação sem condição satisfeita seguida de nova espera; notificação feita por outra rotina pronta; evento processado antes de bloquear; retorno `EAGAIN` quando não há callback de espera; erro do callback de espera e retomada posterior. O callback de processamento é chamado entre os despachos mesmo quando há rotinas prontas. Nenhum caso depende de PIDs, terminal ou tempo de parede.
+
+O callback de espera dos testes produz eventos artificiais e retorna imediatamente após cada um. A integração com `pselect`, máscaras de sinais e eventos reais pertence às histórias de plataforma e aplicação. Não houve medição de satisfação ou tempo total do serviço; as limitações de ferramentas de memória para `ucontext` descritas na US04 permanecem.

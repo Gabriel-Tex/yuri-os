@@ -7,6 +7,7 @@
 
 #define SCHEDULER_THREAD_COUNT 2
 #define SCHEDULER_STACK_BYTES (64u * 1024u)
+#define SCHEDULER_NO_EVENT 0u
 
 enum scheduler_thread_state
 {
@@ -20,6 +21,8 @@ enum scheduler_thread_state
 typedef void (*scheduler_entry)(void *argument);
 typedef void *(*scheduler_allocate)(void *context, size_t bytes);
 typedef void (*scheduler_deallocate)(void *context, void *memory);
+typedef bool (*scheduler_condition)(void *context);
+typedef bool (*scheduler_event_callback)(void *context);
 
 struct scheduler_thread
 {
@@ -28,6 +31,7 @@ struct scheduler_thread
     scheduler_entry entry;
     void *argument;
     enum scheduler_thread_state state;
+    unsigned int wait_event;
 };
 
 struct scheduler
@@ -56,11 +60,28 @@ bool scheduler_create(struct scheduler *scheduler, size_t index,
 bool scheduler_resume(struct scheduler *scheduler, size_t index);
 
 /* Despacha as prontas em round-robin até todas as criadas terminarem.
- * Recusa ausência de rotinas; espera sem prontas será integrada na US06. */
+ * Sem função de espera, retorna EAGAIN se todas as ativas aguardam eventos. */
 bool scheduler_run(struct scheduler *scheduler);
+
+/* Processa eventos antes de cada despacho. Sem prontas, espera por um evento
+ * e volta a processá-los. Callbacks retornam false e definem errno em falha;
+ * process não bloqueia, wait bloqueia até um evento observável. */
+bool scheduler_run_events(struct scheduler *scheduler,
+                          scheduler_event_callback process,
+                          scheduler_event_callback wait, void *context);
 
 /* Devolve o controle ao escalonador e recoloca a rotina no fim da fila. */
 bool scheduler_yield(void);
+
+/* A condição, sem bloqueio ou efeitos colaterais, é verificada antes de
+ * suspender e depois de cada notificação. O evento positivo identifica a
+ * condição; todos os interessados a reavaliam antes de prosseguir. */
+bool scheduler_wait(struct scheduler *scheduler, unsigned int event_id,
+                    scheduler_condition condition, void *context);
+
+/* Acorda as rotinas que aguardam event_id; retorna a quantidade acordada.
+ * Evento zero é inválido e retorna -1 com EINVAL. */
+int scheduler_notify(struct scheduler *scheduler, unsigned int event_id);
 
 /* Retorna o estado da thread no escalonador. */
 enum scheduler_thread_state scheduler_state(const struct scheduler *scheduler,
