@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05) e espera por condição (US06) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06) e adaptação de processos (US07) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -95,6 +95,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 ├── tests/
 │   ├── domain_test.c
 │   ├── scheduler_test.c
+│   ├── processes_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -130,8 +131,9 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/platform/clock.h` / `.c` | Definir instantes/durações e implementar relógio monotônico e conversões verificadas. |
 | `tests/domain_test.c` | Cobrir fila, prioridade, prazo e métricas com tempos artificiais. |
 | `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
+| `tests/processes_test.c` | Cobrir criação, estados e recolhimento de filhos reais por meio da fixture. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
-| `tests/fixtures/controlled_client.c` | Produzir demandas, tempos e falhas controladas somente nos testes. |
+| `tests/fixtures/controlled_client.c` | Produzir estados e falhas controladas nos testes; demandas serão acrescentadas na US08. |
 
 ### Limites dos módulos
 
@@ -203,7 +205,9 @@ Na US06, `scheduler_wait` recebe um identificador positivo e uma função de con
 
 O Atendente seleciona o menor prazo absoluto (`chegada + paciência`); prazos iguais usam a sequência de criação. A busca linear percorre no máximo 100 registros. O atendimento já iniciado não é preemptado. Cliente vencido continua elegível: no finito todos os N devem ser atendidos; no infinito só a parada cancela os ainda não atendidos.
 
-O componente de processos usa `waitpid` com `WNOHANG | WUNTRACED` e esgota os estados disponíveis. Um `SIGCHLD` indica que há trabalho a verificar, não a identidade nem a quantidade de eventos. Distinguir parada inicial, saída com status zero, saída com erro e término por sinal. A aplicação consulta esses eventos também quando há threads prontas, para que produção contínua não atrase a leitura de s ou a coleta de filhos.
+Na US07, `processes_watcher_init` bloqueia `SIGCHLD` no pai e instala um handler que só registra uma flag. `processes_collect` chama `waitpid(-1, ..., WNOHANG | WUNTRACED | WCONTINUED)` até não haver estado disponível e entrega cada PID, tipo, código e status bruto a um único callback consumidor. Parada, continuação, saída zero, saída não zero e término por sinal são distintos. Um `SIGCHLD` não identifica nem limita a quantidade de eventos. `processes_wait` usa `pselect` com desbloqueio temporário de `SIGCHLD` depois da coleta, sem janela entre conferir eventos e aguardar. A aplicação ligará coleta e espera aos callbacks do escalonador, processando eventos entre etapas mesmo com rotinas prontas.
+
+`processes_spawn` exige caminho absoluto do executável, aceita diretório de trabalho explícito e devolve o PID após `fork`, sem esperar a inicialização do filho. O filho restaura a ação e a máscara originais de `SIGCHLD`, fecha descritores acima de 2 e então executa `execv`. Usa `close_range` quando disponível e percorre os descritores até o limite do pai em kernel sem essa chamada. Falhas de preparação ou `execv` saem com 127 e diagnóstico em `stderr`; o status 127 é tratado como falha, mas não distingue por si só uma saída 127 emitida pelo programa. `processes_send` rejeita PID não positivo para impedir sinalização de grupos. O observador restaura ação e máscara no fechamento; a aplicação deve recolher seus filhos antes de fechá-lo.
 
 Quando ambas esperam, `pselect` aguarda entrada e sinais. A máscara de sinais protege a passagem entre checagem da condição e espera, evitando notificações perdidas. Handlers somente registram flags `sig_atomic_t` e preservam `errno` quando necessário; não imprimem, alocam ou trocam contextos. Workers não usam `waitpid` bloqueante, `sem_wait`, `sleep` nem leitura bloqueante. Uma tentativa `sem_trywait` pode indicar indisponibilidade e levar a uma espera do runtime com evento de liberação definido. Antes de `exec`, o filho recebe máscaras, disposições e descritores adequados, sem herdar recursos desnecessários do pai.
 

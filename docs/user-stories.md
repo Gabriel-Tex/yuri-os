@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US06 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US07 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -152,6 +152,8 @@ Resultado: adaptadores testáveis sem executar todo o serviço.
 ### US07 — Criar, observar e recolher filhos
 
 **Tipo:** técnico · **Depende de:** nada · **Cobre:** R01, R13, R17; D07.
+
+**Estado:** concluída em 2026-11-06. `platform/processes` cria filhos com `fork`/`execv`, sinaliza PIDs positivos, coleta estados com `waitpid` não bloqueante e usa `pselect` para aguardar `SIGCHLD` sem janela de notificação perdida. A fixture controlada verifica parada, continuação, saída normal ou anormal, sinal fatal, falha de `exec`, máscara e descritores do filho. Os comandos e limites constam em [verification.md](verification.md#us07--criação-e-coleta-de-processos). A associação dos eventos a clientes e a fonte oficial pertencem às histórias de integração.
 
 **Entrega:** criação, sinalização e coleta de processos reais em um único módulo.
 
@@ -428,7 +430,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01–US06. Há compilação dos testes de domínio, conversão e runtime, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01–US07. Há compilação dos testes de domínio, conversão, runtime e processos, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente oficial, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

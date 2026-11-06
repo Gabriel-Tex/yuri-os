@@ -4,35 +4,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CHECK(condition) do { \
-    if (!(condition)) { \
-        fprintf(stderr, "%s:%d: falhou: %s\n", __FILE__, __LINE__, #condition); \
-        exit(EXIT_FAILURE); \
-    } \
-} while (0)
+#define CHECK(condition)                                                            \
+    do                                                                              \
+    {                                                                               \
+        if (!(condition))                                                           \
+        {                                                                           \
+            fprintf(stderr, "%s:%d: falhou: %s\n", __FILE__, __LINE__, #condition); \
+            exit(EXIT_FAILURE);                                                     \
+        }                                                                           \
+    } while (0)
 
 #define TEST_EVENT_A 1u
 #define TEST_EVENT_B 2u
 
 static bool condition_ready(void *context);
 
-struct trace {
+struct trace
+{
     int values[8];
     size_t count;
 };
 
-struct worker_argument {
+struct worker_argument
+{
     struct trace *trace;
     int id;
     int yields;
     struct scheduler *scheduler;
 };
 
-static void worker(void *argument) {
+static void worker(void *argument)
+{
     struct worker_argument *worker_argument = argument;
     int local = worker_argument->id * 10;
-    for (int step = 0; step < worker_argument->yields; step++) {
-        if (worker_argument->scheduler != NULL) {
+    for (int step = 0; step < worker_argument->yields; step++)
+    {
+        if (worker_argument->scheduler != NULL)
+        {
             size_t own_index = (size_t)(worker_argument->id - 1);
             size_t other_index = 1 - own_index;
             CHECK(scheduler_state(worker_argument->scheduler, own_index) ==
@@ -46,7 +54,8 @@ static void worker(void *argument) {
         CHECK(scheduler_yield());
         local += worker_argument->id;
     }
-    if (worker_argument->scheduler != NULL) {
+    if (worker_argument->scheduler != NULL)
+    {
         size_t own_index = (size_t)(worker_argument->id - 1);
         size_t other_index = 1 - own_index;
         CHECK(scheduler_state(worker_argument->scheduler, own_index) ==
@@ -58,14 +67,17 @@ static void worker(void *argument) {
 }
 
 static void check_trace(const struct trace *trace, const int *expected,
-                        size_t count) {
+                        size_t count)
+{
     CHECK(trace->count == count);
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++)
+    {
         CHECK(trace->values[i] == expected[i]);
     }
 }
 
-static void test_contexts(bool first_finishes_first) {
+static void test_contexts(bool first_finishes_first)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     struct worker_argument first = {&trace, 1, first_finishes_first ? 1 : 2, NULL};
@@ -88,10 +100,13 @@ static void test_contexts(bool first_finishes_first) {
     CHECK(scheduler_state(&scheduler, 1) == SCHEDULER_FINISHED);
     CHECK(!scheduler_resume(&scheduler, final_index));
     CHECK(errno == EINVAL);
-    if (first_finishes_first) {
+    if (first_finishes_first)
+    {
         const int expected[] = {10, 20, 11, 22, 24};
         check_trace(&trace, expected, 5);
-    } else {
+    }
+    else
+    {
         const int expected[] = {10, 20, 11, 22, 12};
         check_trace(&trace, expected, 5);
     }
@@ -99,28 +114,33 @@ static void test_contexts(bool first_finishes_first) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-struct allocation_probe {
+struct allocation_probe
+{
     size_t attempts;
     size_t releases;
     size_t fail_on_attempt;
 };
 
-static void *probe_allocate(void *context, size_t bytes) {
+static void *probe_allocate(void *context, size_t bytes)
+{
     struct allocation_probe *probe = context;
     probe->attempts++;
-    if (probe->attempts == probe->fail_on_attempt) {
+    if (probe->attempts == probe->fail_on_attempt)
+    {
         return NULL;
     }
     return malloc(bytes);
 }
 
-static void probe_deallocate(void *context, void *memory) {
+static void probe_deallocate(void *context, void *memory)
+{
     struct allocation_probe *probe = context;
     probe->releases++;
     free(memory);
 }
 
-static void test_partial_allocation_failure(void) {
+static void test_partial_allocation_failure(void)
+{
     struct scheduler scheduler = {0};
     struct allocation_probe probe = {.fail_on_attempt = 2};
     struct trace trace = {0};
@@ -138,7 +158,8 @@ static void test_partial_allocation_failure(void) {
     CHECK(probe.releases == 1);
 }
 
-static void test_invalid_calls(void) {
+static void test_invalid_calls(void)
+{
     struct scheduler scheduler = {0};
     CHECK(!scheduler_init(NULL, NULL, NULL, NULL));
     CHECK(!scheduler_init(&scheduler, probe_allocate, NULL, NULL));
@@ -157,7 +178,8 @@ static void test_invalid_calls(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_round_robin(bool first_finishes_first) {
+static void test_round_robin(bool first_finishes_first)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     struct worker_argument first = {&trace, 1, first_finishes_first ? 1 : 2,
@@ -171,10 +193,13 @@ static void test_round_robin(bool first_finishes_first) {
     CHECK(scheduler_state(&scheduler, 0) == SCHEDULER_FINISHED);
     CHECK(scheduler_state(&scheduler, 1) == SCHEDULER_FINISHED);
     CHECK(scheduler_run(&scheduler));
-    if (first_finishes_first) {
+    if (first_finishes_first)
+    {
         const int expected[] = {10, 20, 11, 22, 24};
         check_trace(&trace, expected, 5);
-    } else {
+    }
+    else
+    {
         const int expected[] = {10, 20, 11, 22, 12};
         check_trace(&trace, expected, 5);
     }
@@ -183,7 +208,8 @@ static void test_round_robin(bool first_finishes_first) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_one_ready(void) {
+static void test_one_ready(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     struct worker_argument only = {&trace, 2, 2, &scheduler};
@@ -197,7 +223,8 @@ static void test_one_ready(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-struct wait_argument {
+struct wait_argument
+{
     struct scheduler *scheduler;
     struct trace *trace;
     bool *condition;
@@ -206,7 +233,8 @@ struct wait_argument {
     int after;
 };
 
-struct event_probe {
+struct event_probe
+{
     struct scheduler *scheduler;
     bool *first;
     bool *second;
@@ -214,28 +242,33 @@ struct event_probe {
     size_t wait_calls;
 };
 
-struct condition_probe {
+struct condition_probe
+{
     struct scheduler *scheduler;
     struct trace *trace;
     size_t checks;
     bool ready;
 };
 
-static bool condition_ready(void *context) {
+static bool condition_ready(void *context)
+{
     return *(bool *)context;
 }
 
-static bool condition_changes_between_checks(void *context) {
+static bool condition_changes_between_checks(void *context)
+{
     struct condition_probe *probe = context;
     probe->checks++;
-    if (probe->checks == 1) {
+    if (probe->checks == 1)
+    {
         probe->ready = true;
         return false;
     }
     return probe->ready;
 }
 
-static void worker_with_changing_condition(void *context) {
+static void worker_with_changing_condition(void *context)
+{
     struct condition_probe *probe = context;
     probe->trace->values[probe->trace->count++] = 10;
     CHECK(scheduler_wait(probe->scheduler, TEST_EVENT_A,
@@ -243,7 +276,8 @@ static void worker_with_changing_condition(void *context) {
     probe->trace->values[probe->trace->count++] = 11;
 }
 
-static void waiting_worker(void *argument) {
+static void waiting_worker(void *argument)
+{
     struct wait_argument *wait_argument = argument;
     wait_argument->trace->values[wait_argument->trace->count++] =
         wait_argument->before;
@@ -254,7 +288,8 @@ static void waiting_worker(void *argument) {
         wait_argument->after;
 }
 
-static bool process_events(void *context) {
+static bool process_events(void *context)
+{
     struct event_probe *probe = context;
     probe->process_calls++;
     CHECK(scheduler_state(probe->scheduler, 0) != SCHEDULER_RUNNING);
@@ -262,17 +297,20 @@ static bool process_events(void *context) {
     return true;
 }
 
-static bool process_wakes_before_idle(void *context) {
+static bool process_wakes_before_idle(void *context)
+{
     struct event_probe *probe = context;
     CHECK(process_events(context));
-    if (scheduler_state(probe->scheduler, 0) == SCHEDULER_WAITING) {
+    if (scheduler_state(probe->scheduler, 0) == SCHEDULER_WAITING)
+    {
         *probe->first = true;
         CHECK(scheduler_notify(probe->scheduler, TEST_EVENT_A) == 1);
     }
     return true;
 }
 
-static bool wake_both_on_wait(void *context) {
+static bool wake_both_on_wait(void *context)
+{
     struct event_probe *probe = context;
     probe->wait_calls++;
     CHECK(probe->scheduler->ready_count == 0);
@@ -283,53 +321,63 @@ static bool wake_both_on_wait(void *context) {
     return true;
 }
 
-static bool spurious_then_ready(void *context) {
+static bool spurious_then_ready(void *context)
+{
     struct event_probe *probe = context;
     probe->wait_calls++;
     CHECK(probe->scheduler->ready_count == 0);
-    if (probe->wait_calls == 2) {
+    if (probe->wait_calls == 2)
+    {
         *probe->first = true;
     }
     CHECK(scheduler_notify(probe->scheduler, TEST_EVENT_A) == 1);
     return true;
 }
 
-static bool wake_distinct_events(void *context) {
+static bool wake_distinct_events(void *context)
+{
     struct event_probe *probe = context;
     probe->wait_calls++;
     CHECK(probe->scheduler->ready_count == 0);
-    if (probe->wait_calls == 1) {
+    if (probe->wait_calls == 1)
+    {
         *probe->first = true;
         CHECK(scheduler_notify(probe->scheduler, TEST_EVENT_A) == 1);
         CHECK(scheduler_state(probe->scheduler, 1) == SCHEDULER_WAITING);
-    } else {
+    }
+    else
+    {
         *probe->second = true;
         CHECK(scheduler_notify(probe->scheduler, TEST_EVENT_B) == 1);
     }
     return true;
 }
 
-static void notifying_worker(void *context) {
+static void notifying_worker(void *context)
+{
     struct event_probe *probe = context;
     *probe->first = true;
     CHECK(scheduler_notify(probe->scheduler, TEST_EVENT_A) == 1);
 }
 
-static bool unexpected_wait(void *context) {
+static bool unexpected_wait(void *context)
+{
     struct event_probe *probe = context;
     probe->wait_calls++;
     errno = EDEADLK;
     return false;
 }
 
-static bool failing_wait(void *context) {
+static bool failing_wait(void *context)
+{
     struct event_probe *probe = context;
     probe->wait_calls++;
     errno = EIO;
     return false;
 }
 
-static void test_waiting_together(void) {
+static void test_waiting_together(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -350,7 +398,8 @@ static void test_waiting_together(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_early_notification(void) {
+static void test_early_notification(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = true;
@@ -367,7 +416,8 @@ static void test_early_notification(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_condition_changes_before_suspend(void) {
+static void test_condition_changes_before_suspend(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     struct condition_probe probe = {&scheduler, &trace, 0, false};
@@ -381,7 +431,8 @@ static void test_condition_changes_before_suspend(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_spurious_notification(void) {
+static void test_spurious_notification(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -397,7 +448,8 @@ static void test_spurious_notification(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_distinct_events(void) {
+static void test_distinct_events(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool first_ready = false;
@@ -418,7 +470,8 @@ static void test_distinct_events(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_wait_without_callback(void) {
+static void test_wait_without_callback(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -437,7 +490,8 @@ static void test_wait_without_callback(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_notification_from_running_worker(void) {
+static void test_notification_from_running_worker(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -455,7 +509,8 @@ static void test_notification_from_running_worker(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_event_processed_before_idle(void) {
+static void test_event_processed_before_idle(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -472,7 +527,8 @@ static void test_event_processed_before_idle(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-static void test_wait_callback_failure(void) {
+static void test_wait_callback_failure(void)
+{
     struct scheduler scheduler = {0};
     struct trace trace = {0};
     bool ready = false;
@@ -494,7 +550,8 @@ static void test_wait_callback_failure(void) {
     CHECK(scheduler_destroy(&scheduler));
 }
 
-int main(void) {
+int main(void)
+{
     test_contexts(true);
     test_contexts(false);
     test_partial_allocation_failure();

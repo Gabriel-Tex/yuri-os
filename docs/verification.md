@@ -86,3 +86,18 @@ Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio compilado em C1
 `scheduler_test.c` usa eventos artificiais para verificar duas rotinas esperando o mesmo evento e acordadas juntas; identificadores distintos; notificação anterior à espera; condição que muda entre duas leituras antes da suspensão; notificação sem condição satisfeita seguida de nova espera; notificação feita por outra rotina pronta; evento processado antes de bloquear; retorno `EAGAIN` quando não há callback de espera; erro do callback de espera e retomada posterior. O callback de processamento é chamado entre os despachos mesmo quando há rotinas prontas. Nenhum caso depende de PIDs, terminal ou tempo de parede.
 
 O callback de espera dos testes produz eventos artificiais e retorna imediatamente após cada um. A integração com `pselect`, máscaras de sinais e eventos reais pertence às histórias de plataforma e aplicação. Não houve medição de satisfação ou tempo total do serviço; as limitações de ferramentas de memória para `ucontext` descritas na US04 permanecem.
+
+## US07 — Criação e coleta de processos
+
+Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio e fixture compilados em C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 20s make test` | Cinco testes passaram com `-O2 -g`, sem avisos. A fixture exibiu os diagnósticos esperados de `execv` e `chdir`; o watchdog não disparou. |
+| `timeout 20s make debug` | Cinco testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `timeout 30s bash -c 'for iteration in {1..20}; do ./build/processes_test /home/gabriel/S5/SO-yuri/build/controlled_client >/dev/null 2>&1 || exit 1; done'` | Vinte execuções consecutivas da integração de processos passaram; o watchdog não disparou. |
+| `git diff --check` | Sem erros de whitespace nas alterações rastreadas. |
+
+`processes_test.c` usa filhos reais da fixture para confirmar parada inicial, continuação, saída zero, saída com código 7, término por `SIGTERM`, falha de `execv` e diretório inexistente com saída 127. Também verifica máscara de `SIGCHLD` restaurada no filho, máscara adicional preservada, fechamento de descritor herdado, diretório de trabalho, rejeição de PID não positivo, restauração do handler e da máscara no pai, e fechamento repetido. Quatro filhos são observados com `waitid(..., WNOWAIT)` antes de uma única chamada a `processes_collect`, que recolhe os quatro; `waitpid` confirma `ECHILD` ao fim. Um segundo observador exercita `pselect` com `SIGCHLD` originalmente bloqueado. O diretório temporário criado pelo teste é removido.
+
+Falha real de `fork` não foi provocada: o módulo devolve erro sem modificar o PID de saída, mas a condição depende de limites do sistema e não foi alterada no ambiente de teste. Falhas das chamadas de configuração de sinais e o fallback de `close_range` para kernels antigos também não foram injetados. `execv` falho é identificado no pai por saída 127 e diagnóstico do filho; o mesmo código pode ser emitido por um programa executado. O cliente oficial e o serviço completo permanecem fora desta verificação; não há medição de satisfação ou duração do produto.
