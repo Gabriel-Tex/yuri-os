@@ -13,6 +13,7 @@ enum scheduler_thread_state
     SCHEDULER_EMPTY,
     SCHEDULER_READY,
     SCHEDULER_RUNNING,
+    SCHEDULER_WAITING,
     SCHEDULER_FINISHED
 };
 
@@ -37,6 +38,8 @@ struct scheduler
     scheduler_deallocate deallocate;
     void *allocator_context;
     size_t running_index;
+    size_t ready_queue[SCHEDULER_THREAD_COUNT];
+    size_t ready_count;
     bool initialized;
 };
 
@@ -49,11 +52,14 @@ bool scheduler_init(struct scheduler *scheduler, scheduler_allocate allocate,
 bool scheduler_create(struct scheduler *scheduler, size_t index,
                       scheduler_entry entry, void *argument);
 
-/* US04 expõe despacho manual para testar contextos. US05 definirá a política.
- * yield só pode ser chamado pela rotina em execução; término volta via uc_link. */
+/* Despacha uma rotina pronta explicitamente; a fila mantém as demais prontas. */
 bool scheduler_resume(struct scheduler *scheduler, size_t index);
 
-/* Devolve o controle para o escalonador. */
+/* Despacha as prontas em round-robin até todas as criadas terminarem.
+ * Recusa ausência de rotinas; espera sem prontas será integrada na US06. */
+bool scheduler_run(struct scheduler *scheduler);
+
+/* Devolve o controle ao escalonador e recoloca a rotina no fim da fila. */
 bool scheduler_yield(void);
 
 /* Retorna o estado da thread no escalonador. */

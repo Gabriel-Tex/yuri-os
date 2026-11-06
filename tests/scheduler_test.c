@@ -20,15 +20,34 @@ struct worker_argument {
     struct trace *trace;
     int id;
     int yields;
+    struct scheduler *scheduler;
 };
 
 static void worker(void *argument) {
     struct worker_argument *worker_argument = argument;
     int local = worker_argument->id * 10;
     for (int step = 0; step < worker_argument->yields; step++) {
+        if (worker_argument->scheduler != NULL) {
+            size_t own_index = (size_t)(worker_argument->id - 1);
+            size_t other_index = 1 - own_index;
+            CHECK(scheduler_state(worker_argument->scheduler, own_index) ==
+                  SCHEDULER_RUNNING);
+            CHECK(scheduler_state(worker_argument->scheduler, other_index) !=
+                  SCHEDULER_RUNNING);
+            CHECK(!scheduler_run(worker_argument->scheduler));
+            CHECK(errno == EINVAL);
+        }
         worker_argument->trace->values[worker_argument->trace->count++] = local;
         CHECK(scheduler_yield());
         local += worker_argument->id;
+    }
+    if (worker_argument->scheduler != NULL) {
+        size_t own_index = (size_t)(worker_argument->id - 1);
+        size_t other_index = 1 - own_index;
+        CHECK(scheduler_state(worker_argument->scheduler, own_index) ==
+              SCHEDULER_RUNNING);
+        CHECK(scheduler_state(worker_argument->scheduler, other_index) !=
+              SCHEDULER_RUNNING);
     }
     worker_argument->trace->values[worker_argument->trace->count++] = local;
 }
@@ -44,8 +63,8 @@ static void check_trace(const struct trace *trace, const int *expected,
 static void test_contexts(bool first_finishes_first) {
     struct scheduler scheduler = {0};
     struct trace trace = {0};
-    struct worker_argument first = {&trace, 1, first_finishes_first ? 1 : 2};
-    struct worker_argument second = {&trace, 2, first_finishes_first ? 2 : 1};
+    struct worker_argument first = {&trace, 1, first_finishes_first ? 1 : 2, NULL};
+    struct worker_argument second = {&trace, 2, first_finishes_first ? 2 : 1, NULL};
     CHECK(scheduler_init(&scheduler, NULL, NULL, NULL));
     CHECK(scheduler_create(&scheduler, 0, worker, &first));
     CHECK(scheduler_create(&scheduler, 1, worker, &second));
@@ -100,7 +119,7 @@ static void test_partial_allocation_failure(void) {
     struct scheduler scheduler = {0};
     struct allocation_probe probe = {.fail_on_attempt = 2};
     struct trace trace = {0};
-    struct worker_argument argument = {&trace, 1, 0};
+    struct worker_argument argument = {&trace, 1, 0, NULL};
     CHECK(scheduler_init(&scheduler, probe_allocate, probe_deallocate, &probe));
     CHECK(scheduler_create(&scheduler, 0, worker, &argument));
     CHECK(!scheduler_create(&scheduler, 1, worker, &argument));
@@ -121,9 +140,51 @@ static void test_invalid_calls(void) {
     CHECK(!scheduler_yield());
     CHECK(!scheduler_create(&scheduler, 0, worker, NULL));
     CHECK(scheduler_init(&scheduler, NULL, NULL, NULL));
+    CHECK(!scheduler_run(&scheduler));
+    CHECK(errno == EINVAL);
     CHECK(!scheduler_create(&scheduler, 2, worker, NULL));
     CHECK(!scheduler_create(&scheduler, 0, NULL, NULL));
     CHECK(scheduler_state(&scheduler, 0) == SCHEDULER_EMPTY);
+    CHECK(scheduler_destroy(&scheduler));
+}
+
+static void test_round_robin(bool first_finishes_first) {
+    struct scheduler scheduler = {0};
+    struct trace trace = {0};
+    struct worker_argument first = {&trace, 1, first_finishes_first ? 1 : 2,
+                                    &scheduler};
+    struct worker_argument second = {&trace, 2, first_finishes_first ? 2 : 1,
+                                     &scheduler};
+    CHECK(scheduler_init(&scheduler, NULL, NULL, NULL));
+    CHECK(scheduler_create(&scheduler, 0, worker, &first));
+    CHECK(scheduler_create(&scheduler, 1, worker, &second));
+    CHECK(scheduler_run(&scheduler));
+    CHECK(scheduler_state(&scheduler, 0) == SCHEDULER_FINISHED);
+    CHECK(scheduler_state(&scheduler, 1) == SCHEDULER_FINISHED);
+    CHECK(scheduler_run(&scheduler));
+    if (first_finishes_first) {
+        const int expected[] = {10, 20, 11, 22, 24};
+        check_trace(&trace, expected, 5);
+    } else {
+        const int expected[] = {10, 20, 11, 22, 12};
+        check_trace(&trace, expected, 5);
+    }
+    CHECK(!scheduler_resume(&scheduler, 0));
+    CHECK(errno == EINVAL);
+    CHECK(scheduler_destroy(&scheduler));
+}
+
+static void test_one_ready(void) {
+    struct scheduler scheduler = {0};
+    struct trace trace = {0};
+    struct worker_argument only = {&trace, 2, 2, &scheduler};
+    CHECK(scheduler_init(&scheduler, NULL, NULL, NULL));
+    CHECK(scheduler_create(&scheduler, 1, worker, &only));
+    CHECK(scheduler_run(&scheduler));
+    CHECK(scheduler_state(&scheduler, 0) == SCHEDULER_EMPTY);
+    CHECK(scheduler_state(&scheduler, 1) == SCHEDULER_FINISHED);
+    const int expected[] = {20, 22, 24};
+    check_trace(&trace, expected, 3);
     CHECK(scheduler_destroy(&scheduler));
 }
 
@@ -132,6 +193,9 @@ int main(void) {
     test_contexts(false);
     test_partial_allocation_failure();
     test_invalid_calls();
-    puts("Runtime: contextos, retorno e falha parcial passaram (US04).");
+    test_round_robin(true);
+    test_round_robin(false);
+    test_one_ready();
+    puts("Runtime: contextos, round-robin e falha parcial passaram (US04-US05).");
     return EXIT_SUCCESS;
 }

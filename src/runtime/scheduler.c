@@ -8,6 +8,27 @@
  * do kernel, o despacho registra somente o escalonador ativo durante a troca. */
 static struct scheduler *scheduler_active;
 
+/* A fila contém cada rotina READY uma única vez. A remoção arbitrária
+ * preserva o despacho manual usado pelos testes de contextos. */
+static void scheduler_enqueue(struct scheduler *scheduler, size_t index)
+{
+    scheduler->ready_queue[scheduler->ready_count++] = index;
+}
+
+static void scheduler_remove_ready(struct scheduler *scheduler, size_t index)
+{
+    size_t position = 0;
+    while (scheduler->ready_queue[position] != index)
+    {
+        position++;
+    }
+    scheduler->ready_count--;
+    for (; position < scheduler->ready_count; position++)
+    {
+        scheduler->ready_queue[position] = scheduler->ready_queue[position + 1];
+    }
+}
+
 static void *scheduler_default_allocate(void *context, size_t bytes)
 {
     (void)context;
@@ -86,6 +107,7 @@ bool scheduler_create(struct scheduler *scheduler, size_t index,
     thread->context.uc_link = &scheduler->dispatcher_context;
     makecontext(&thread->context, scheduler_trampoline, 0);
     thread->state = SCHEDULER_READY;
+    scheduler_enqueue(scheduler, index);
     return true;
 }
 
@@ -99,6 +121,7 @@ bool scheduler_resume(struct scheduler *scheduler, size_t index)
         errno = EINVAL;
         return false;
     }
+    scheduler_remove_ready(scheduler, index);
     scheduler_active = scheduler;
     scheduler->running_index = index;
     scheduler->threads[index].state = SCHEDULER_RUNNING;
@@ -107,6 +130,7 @@ bool scheduler_resume(struct scheduler *scheduler, size_t index)
     {
         int saved_errno = errno;
         scheduler->threads[index].state = SCHEDULER_READY;
+        scheduler_enqueue(scheduler, index);
         scheduler->running_index = SCHEDULER_THREAD_COUNT;
         scheduler_active = NULL;
         errno = saved_errno;
@@ -114,6 +138,41 @@ bool scheduler_resume(struct scheduler *scheduler, size_t index)
     }
     scheduler->running_index = SCHEDULER_THREAD_COUNT;
     scheduler_active = NULL;
+    return true;
+}
+
+bool scheduler_run(struct scheduler *scheduler)
+{
+    if (scheduler == NULL || !scheduler->initialized || scheduler_active != NULL)
+    {
+        errno = EINVAL;
+        return false;
+    }
+    bool created = false;
+    for (size_t i = 0; i < SCHEDULER_THREAD_COUNT; i++)
+    {
+        created |= scheduler->threads[i].state != SCHEDULER_EMPTY;
+    }
+    if (!created)
+    {
+        errno = EINVAL;
+        return false;
+    }
+    while (scheduler->ready_count > 0)
+    {
+        if (!scheduler_resume(scheduler, scheduler->ready_queue[0]))
+        {
+            return false;
+        }
+    }
+    for (size_t i = 0; i < SCHEDULER_THREAD_COUNT; i++)
+    {
+        if (scheduler->threads[i].state == SCHEDULER_WAITING)
+        {
+            errno = EAGAIN;
+            return false;
+        }
+    }
     return true;
 }
 
@@ -132,8 +191,10 @@ bool scheduler_yield(void)
         return false;
     }
     thread->state = SCHEDULER_READY;
+    scheduler_enqueue(scheduler, scheduler->running_index);
     if (swapcontext(&thread->context, &scheduler->dispatcher_context) == -1)
     {
+        scheduler_remove_ready(scheduler, scheduler->running_index);
         thread->state = SCHEDULER_RUNNING;
         return false;
     }
@@ -171,6 +232,8 @@ bool scheduler_destroy(struct scheduler *scheduler)
         }
         scheduler->threads[i].state = SCHEDULER_EMPTY;
     }
+    scheduler->ready_count = 0;
+    scheduler->running_index = SCHEDULER_THREAD_COUNT;
     scheduler->initialized = false;
     return true;
 }

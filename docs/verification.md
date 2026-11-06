@@ -58,3 +58,17 @@ Data: 2026-11-05. Ambiente: Linux x86_64/glibc; código próprio compilado em C1
 `scheduler_test.c` despacha duas rotinas com pilhas próprias e verifica variáveis locais preservadas após `scheduler_yield`, retorno pelo `uc_link`, término em ambas as ordens e recusa de novo despacho de uma rotina terminada. Um alocador controlado falha na segunda pilha; a destruição libera a primeira uma vez e tolera repetição. Chamadas inválidas também são recusadas.
 
 O teste cobre contextos e liberação após retorno ao escalonador. Ainda não há seleção automática, espera por condição, processos clientes nem carga oficial. Ferramentas de análise de memória e ThreadSanitizer podem não representar corretamente trocas por `ucontext`; não foram executadas aqui. O teste não mede desempenho do serviço.
+
+## US05 — Escalonamento round-robin
+
+Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio compilado em C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 10s make test` | Os quatro testes passaram; o watchdog não disparou. O módulo alterado compilou sem avisos com `-O2 -g`. |
+| `timeout 20s make debug` | Os quatro testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `git diff --check` | Sem erros de whitespace nas alterações rastreadas. |
+
+`scheduler_test.c` verifica alternância automática das duas rotinas pela sequência observada, com cada uma terminando primeiro em cenários distintos. Também verifica execução de uma única rotina criada, estado `RUNNING` exclusivo durante cada etapa, recusa de reentrada em `scheduler_run`, ausência de novo despacho após `FINISHED` e repetição de `scheduler_run` sem executar rotinas terminadas. As sequências usam somente cessões explícitas, sem relógio de parede.
+
+O estado `WAITING` ainda não tem transição pública: espera, despertar e processamento de eventos pertencem à US06. Não há clientes, processos ou medição de desempenho do serviço nesta verificação. As limitações de ferramentas de memória para `ucontext` descritas na US04 permanecem.

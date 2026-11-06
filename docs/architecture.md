@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), e contextos de threads de usuário (US04) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04) e despacho round-robin (US05) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -156,7 +156,7 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 | Processo filho | Evento com PID, tipo de mudança e status; um único consumidor recolhe os estados por `waitpid`. |
 | Resultado | Contadores, taxa quando definida, tempo total e status de sucesso ou falha. |
 
-O runtime recebe da aplicação uma função de processamento de eventos e seu contexto. Ela consulta eventos entre despachos e pode aguardar quando nenhuma thread está pronta. As assinaturas C serão definidas ao implementar cada módulo; não há necessidade de um barramento genérico.
+Na US05, o runtime despacha a fila de prontas sem função de eventos. A US06 acrescentará processamento entre despachos e espera quando não houver prontas; não há necessidade de um barramento genérico.
 
 ### Registro do cliente — US01
 
@@ -193,7 +193,9 @@ As duas threads de usuário têm pilhas e contextos próprios. O escalonador man
 
 Na US04, `scheduler_init` prepara o descritor e o contexto do escalonador; `scheduler_create` aloca uma pilha de 64 KiB para cada uma das duas rotinas e prepara `makecontext`. `scheduler_resume` usa `swapcontext` para executar uma rotina escolhida explicitamente, e `scheduler_yield` devolve o controle preservando suas variáveis locais. O trampoline chama a rotina com seu argumento, marca `FINISHED` e retorna pelo `uc_link` ao contexto do escalonador. `scheduler_destroy` libera as pilhas somente fora da execução de uma rotina, inclusive após criação parcial; sua repetição não libera duas vezes. O descritor deve ser novo ou já destruído antes de chamar `scheduler_init`, e permanecer no mesmo endereço enquanto os contextos existirem.
 
-`makecontext` não transporta ponteiros de forma portável. O runtime usa um ponteiro privado para o escalonador ativo apenas durante um despacho; como a execução ocorre em uma thread do kernel, não há despachos simultâneos. O alocador e o liberador opcionais permitem exercitar falha parcial; quando omitidos, são `malloc` e `free`. Esta etapa oferece despacho manual para verificar contextos. A seleção round-robin, estados de espera e eventos pertencem às US05–US06.
+Na US05, a fila interna guarda cada rotina `READY` uma única vez, em ordem de prontidão. A criação acrescenta a rotina ao fim; `scheduler_yield` muda `RUNNING` para `READY`, acrescenta ao fim e devolve o controle. `scheduler_resume` remove da fila a rotina escolhida, preservando o despacho manual da US04. `scheduler_run` escolhe sempre a primeira pronta, prossegue enquanto houver prontas e retorna quando todas as rotinas criadas estiverem `FINISHED`; uma segunda chamada não as executa novamente. Somente a rotina despachada fica `RUNNING`. O estado `WAITING` existe no contrato, mas nenhuma operação o produz antes da US06. Sem rotinas criadas, `scheduler_run` recusa a chamada.
+
+`makecontext` não transporta ponteiros de forma portável. O runtime usa um ponteiro privado para o escalonador ativo apenas durante um despacho; como a execução ocorre em uma thread do kernel, não há despachos simultâneos. O alocador e o liberador opcionais permitem exercitar falha parcial; quando omitidos, são `malloc` e `free`. O despacho manual permite verificar contextos; o round-robin foi implementado na US05. Estados de espera e eventos pertencem à US06.
 
 O Atendente seleciona o menor prazo absoluto (`chegada + paciência`); prazos iguais usam a sequência de criação. A busca linear percorre no máximo 100 registros. O atendimento já iniciado não é preemptado. Cliente vencido continua elegível: no finito todos os N devem ser atendidos; no infinito só a parada cancela os ainda não atendidos.
 

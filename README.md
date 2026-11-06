@@ -2,13 +2,13 @@
 
 Este repositório contém o início da implementação da primeira parte do trabalho prático: um atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário. O cliente fornecido pelo professor e o processo Analista compõem o fluxo planejado. A implementação usa C17 para Linux/glibc.
 
-US01–US04 estão implementadas: registro e transições de estado, fila limitada, métricas com tempos fornecidos pelo chamador e contextos independentes de threads de usuário. A fila reserva uma vaga para o cliente em inicialização e escolhe o próximo pelo menor prazo absoluto. As métricas usam a resposta desde a chegada, incluindo espera e serviço. O runtime cria duas pilhas e permite despacho manual e retorno ao escalonador; a política automática e a espera por eventos vêm nas US05–US06. As decisões de implementação devem buscar maximizar satisfação e minimizar o tempo total, respeitando os requisitos e a carga oficial. Ainda não há serviço executável nem integração com processos; `service N X` permanece a interface planejada.
+US01–US05 estão implementadas: registro e transições de estado, fila limitada, métricas com tempos fornecidos pelo chamador, contextos independentes de threads de usuário e despacho round-robin. A fila reserva uma vaga para o cliente em inicialização e escolhe o próximo pelo menor prazo absoluto. As métricas usam a resposta desde a chegada, incluindo espera e serviço. O runtime cria duas pilhas, conserva o despacho manual para testes e oferece `scheduler_run` para alternar automaticamente as rotinas prontas até o término. Espera e despertar por eventos pertencem à US06. As decisões de implementação devem buscar maximizar satisfação e minimizar o tempo total, respeitando os requisitos e a carga oficial. Ainda não há serviço executável nem integração com processos; `service N X` permanece a interface planejada.
 
 Para compilar e verificar o domínio, instale um compilador C17 e GNU Make:
 
 ```sh
 make          # Compila os testes de domínio, conversão e runtime em build/.
-make test     # Executa os quatro testes; o runtime usa ucontext.
+make test     # Executa os quatro testes; o runtime usa ucontext e round-robin.
 make debug    # Compila e testa com -O0 -g3 em build/debug/.
 make clean    # Remove somente build/; preserva fontes e run/.
 ```

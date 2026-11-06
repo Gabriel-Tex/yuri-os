@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US04 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US05 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -86,7 +86,7 @@ Resultado: duas threads de usuário com contextos próprios, sem conhecimento da
 
 **Tipo:** técnico · **Depende de:** nada · **Cobre:** R01–R02; D01–D03.
 
-**Estado:** concluída em 2026-11-05. Contextos, pilhas, troca manual e retorno ao escalonador em `src/runtime/scheduler.{h,c}`; dois cenários de ordem de término e falha controlada de alocação em `tests/scheduler_test.c`. O registro de execução está em [verification.md](verification.md#us04--contextos-e-pilhas). Despacho round-robin e espera por condição continuam nas US05–US06.
+**Estado:** concluída em 2026-11-05. Contextos, pilhas, troca manual e retorno ao escalonador em `src/runtime/scheduler.{h,c}`; dois cenários de ordem de término e falha controlada de alocação em `tests/scheduler_test.c`. O registro de execução está em [verification.md](verification.md#us04--contextos-e-pilhas). O despacho round-robin foi acrescentado na US05; espera por condição continua na US06.
 
 **Entrega:** contextos independentes para as rotinas e um contexto do escalonador, com propriedade clara das pilhas.
 
@@ -106,6 +106,8 @@ Resultado: duas threads de usuário com contextos próprios, sem conhecimento da
 ### US05 — Escalonar apenas threads prontas
 
 **Tipo:** técnico · **Depende de:** US04 · **Cobre:** R02; D04.
+
+**Estado:** concluída em 2026-11-06. Fila de prontas e `scheduler_run` executam round-robin entre as rotinas criadas; `scheduler_yield` recoloca a rotina no fim da fila. Testes determinísticos cobrem dois ordenamentos de término, uma única rotina pronta, exclusividade de `RUNNING` e recusa de novo despacho após o término. O registro está em [verification.md](verification.md#us05--escalonamento-round-robin). `WAITING` está reservado para as operações de espera e despertar da US06.
 
 **Entrega:** despacho round-robin entre `READY`, com estados `RUNNING`, `WAITING` e `FINISHED` consistentes.
 
@@ -424,7 +426,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01–US04. Há compilação dos testes de domínio, conversão e runtime, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01–US05. Há compilação dos testes de domínio, conversão e runtime, alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 
