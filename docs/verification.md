@@ -142,3 +142,16 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `completion_file_test.c` usou diretório temporário e semáforo POSIX sem nome. Verificou bloqueio ocupado sem espera, arquivo vazio, inclusão e saída em ordem para 1, 10, 11 e 27 PIDs, limites dos lotes e contagem após cada compactação. A saída `/dev/full` falhou com `ENOSPC` e preservou a linha não impressa; uma linha inválida foi recusada sem alterar a saída nem o arquivo. Dois handles abertos antes da compactação observaram a inclusão posterior no inode novo. O teste removeu seus arquivos e semáforo.
 
 Falhas reais de escrita parcial e de `renameat` não foram injetadas; o código trata escritas parciais e constrói o arquivo substituto antes da troca. A confirmação pelo Analista, a coordenação dos despertares e o cliente oficial ainda não foram verificados nesta história. Não há medição de satisfação ou tempo do serviço.
+
+## US11 — Processo Analista
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 40s make test` | Nove testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 50s make debug` | Nove testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+
+`analyst_test.c` criou o Analista como filho real e confirmou `analyst.pid`, parada inicial sem saída, um lote por `SIGCONT` e nova parada. Foram exercitados lotes de 0, 1, 10, 11 e 27 PIDs; a saída e a contagem restante corresponderam a cada despertar. O teste encerrou e recolheu o primeiro Analista. Um segundo Analista com `stdout` em `/dev/full` terminou com erro e preservou o PID pendente. Um terceiro encontrou linha inválida, terminou com erro e deixou o arquivo intacto. Os diagnósticos dessas duas falhas são esperados. O teste removeu os arquivos temporários e os semáforos próprios e confirmou ausência de filhos.
+
+Os PIDs usados como conteúdo são sintéticos; a criação e o recolhimento do Analista são reais. A política de despertar e a drenagem automática do serviço pertencem à US12 e à integração posterior. O cliente oficial e as métricas do serviço ainda não foram exercitados.

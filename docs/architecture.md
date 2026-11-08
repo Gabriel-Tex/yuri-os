@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09) e arquivo de PIDs (US10) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10) e processo Analista (US11) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -101,6 +101,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── demand_test.c
 │   ├── ipc_test.c
 │   ├── completion_file_test.c
+│   ├── analyst_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -141,6 +142,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/demand_test.c` | Cobrir a sessão de inicialização e a validação do arquivo com filhos reais. |
 | `tests/ipc_test.c` | Cobrir exclusão de instância, semáforos e limpeza parcial com recursos POSIX reais. |
 | `tests/completion_file_test.c` | Cobrir inclusão, validação, saída e compactação dos PIDs sob proteção. |
+| `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
@@ -264,6 +266,8 @@ Na US10, `completion_file_open` cria `completed.log` somente se ausente no servi
 1. O Atendente solicita o despertar; o serviço envia `SIGCONT` somente se o Analista estiver comprovadamente parado e houver PIDs pendentes.
 2. O Analista adquire a proteção, imprime e confirma a saída de até dez primeiros PIDs, remove esses registros, libera a proteção e volta a `SIGSTOP`.
 3. O serviço observa a nova parada antes de autorizar outro lote. Desperta ao chegar a dez PIDs, durante ociosidade com pendências ou ao drenar o arquivo.
+
+Na US11, `analyst` recebe o diretório absoluto da execução, abre `/sem_block` e `completed.log` já criados, grava seu próprio PID em `analyst.pid` com criação exclusiva e para com `SIGSTOP`. A cada `SIGCONT` recebido enquanto parado, adquire o semáforo, imprime um lote de no máximo dez PIDs, libera a proteção e para novamente. Erro de arquivo, saída ou semáforo é diagnosticado em `stderr` e termina com código não zero; `SIGPIPE` é ignorado para que erro de escrita seja tratado. O serviço permanece responsável por comparar o PID do arquivo com o filho que criou, confirmar cada parada e recolher o processo.
 
 Não acrescentar PIDs enquanto o Analista consome um lote. Se um cliente terminar nesse intervalo, o Atendente guarda a conclusão pendente até a nova parada; a Recepção ainda pode progredir. Para 27 pendências, a drenagem precisa confirmar lotes de 10, 10 e 7 e verificar o arquivo vazio. Falha de saída ou arquivo encerra com erro; um sinal enviado não é confirmação de impressão. Não há recuperação transacional após crash entre impressão e compactação, que poderia duplicar uma saída.
 
