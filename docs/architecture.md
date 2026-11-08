@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08) e IPC (US09) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09) e arquivo de PIDs (US10) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -100,6 +100,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── processes_test.c
 │   ├── demand_test.c
 │   ├── ipc_test.c
+│   ├── completion_file_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -139,6 +140,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/processes_test.c` | Cobrir criação, estados e recolhimento de filhos reais por meio da fixture. |
 | `tests/demand_test.c` | Cobrir a sessão de inicialização e a validação do arquivo com filhos reais. |
 | `tests/ipc_test.c` | Cobrir exclusão de instância, semáforos e limpeza parcial com recursos POSIX reais. |
+| `tests/completion_file_test.c` | Cobrir inclusão, validação, saída e compactação dos PIDs sob proteção. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
@@ -254,6 +256,8 @@ A reserva impede ultrapassar 100 clientes à espera mesmo com um `STARTING`. Um 
 Há um único cliente em atendimento. `/sem_atend` existe para o protocolo do cliente, mas sua disponibilidade não comprova término: após `SIGCONT`, o filho pode ainda não tê-lo adquirido. A confirmação vem do estado recolhido do processo.
 
 ### Analista e arquivo
+
+Na US10, `completion_file_open` cria `completed.log` somente se ausente no serviço e o abre já existente no Analista. O objeto recebe `/sem_block` do chamador; a tentativa de lock não bloqueia o Atendente e o lock bloqueante fica restrito ao processo Analista. Inclusão, contagem e impressão exigem posse do lock. Cada PID positivo ocupa uma linha decimal; a leitura valida todas as linhas antes de imprimir. `completion_file_print_batch` escreve até dez linhas diretamente no descritor de saída, conta apenas linhas totalmente escritas e substitui o arquivo por um temporário com o sufixo ainda pendente. Erro de validação ou de saída antes da primeira linha mantém o arquivo; erro de compactação não afirma consumo. A troca por `renameat` evita truncar o arquivo original antes da cópia completa. Cada operação reabre o nome sob o semáforo para observar o inode atual, mesmo se outro processo tiver compactado o arquivo. A função não promete recuperação transacional após queda entre impressão e troca.
 
 `completed.log` contém um PID decimal por linha, na ordem das conclusões. `/sem_block` protege o arquivo e `/sem_atend` preserva o nome esperado pelo cliente ilustrado.
 

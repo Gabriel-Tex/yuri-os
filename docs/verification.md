@@ -129,3 +129,16 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `ipc_test.c` cria os semáforos inicialmente disponíveis, verifica `sem_trywait` ocupado sem espera, acesso por outro handle e exclusão de uma segunda instância em processo filho. Após o fechamento repetido, os dois nomes estavam ausentes. Com `/sem_block` criado pelo próprio teste antes da inicialização, esta falhou com `EEXIST`, removeu apenas `/sem_atend` criado parcialmente e preservou `/sem_block` até o teste liberá-lo. Uma nova inicialização após a limpeza passou. O filho foi recolhido; o arquivo de lock permanece deliberadamente em `/tmp` com o mesmo inode, sem bloqueio ativo.
 
 O teste não modifica semáforos preexistentes para preparar o ambiente: se houver um deles antes da execução, falha no pré-requisito e exige diagnóstico da origem. Falhas reais de `sem_close`, `sem_unlink` e `flock` não foram injetadas. A integração de `/sem_atend` com o cliente oficial e `/sem_block` com o Analista ainda depende das histórias seguintes; não houve medição de satisfação nem duração do serviço.
+
+## US10 — Arquivo de PIDs
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 40s make test` | Oito testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 50s make debug` | Oito testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+
+`completion_file_test.c` usou diretório temporário e semáforo POSIX sem nome. Verificou bloqueio ocupado sem espera, arquivo vazio, inclusão e saída em ordem para 1, 10, 11 e 27 PIDs, limites dos lotes e contagem após cada compactação. A saída `/dev/full` falhou com `ENOSPC` e preservou a linha não impressa; uma linha inválida foi recusada sem alterar a saída nem o arquivo. Dois handles abertos antes da compactação observaram a inclusão posterior no inode novo. O teste removeu seus arquivos e semáforo.
+
+Falhas reais de escrita parcial e de `renameat` não foram injetadas; o código trata escritas parciais e constrói o arquivo substituto antes da troca. A confirmação pelo Analista, a coordenação dos despertares e o cliente oficial ainda não foram verificados nesta história. Não há medição de satisfação ou tempo do serviço.

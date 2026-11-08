@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US09 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US10 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -223,6 +223,8 @@ Resultado: registro e consumo em lotes verificáveis sem uma Recepção real.
 
 **Tipo:** técnico · **Depende de:** US09 · **Cobre:** R09, R11, R16.
 
+**Estado:** concluída em 2026-11-08. `platform/completion_file` controla o bloqueio, acrescenta PIDs decimais, valida o arquivo e imprime/compacta lotes de até dez linhas. Os testes e limites constam em [verification.md](verification.md#us10--arquivo-de-pids).
+
 **Entrega:** arquivo de um PID decimal por linha, com inclusão ao final e consumo somente do prefixo impresso.
 
 **Aceite:**
@@ -434,7 +436,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01–US09. Há compilação dos testes de domínio, conversão, runtime, processos, demanda e IPC, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente oficial, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01–US10. Há compilação dos testes de domínio, conversão, runtime, processos, demanda, IPC e arquivo de PIDs, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Executáveis do serviço, Analista e cliente oficial, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 
