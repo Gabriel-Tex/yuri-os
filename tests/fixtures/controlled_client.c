@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 
 static int check_descriptor(const char *number)
@@ -28,6 +30,36 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "exit0") == 0)
     {
         return 0;
+    }
+    if (strcmp(argv[1], "demand") == 0 && argc == 3)
+    {
+        FILE *file = fopen("demanda.txt", "w");
+        if (file == NULL || fputs(argv[2], file) == EOF || fclose(file) == EOF)
+        {
+            return 20;
+        }
+        if (raise(SIGSTOP) != 0)
+        {
+            return 21;
+        }
+        return 0;
+    }
+    if (strcmp(argv[1], "demand_delayed") == 0 && argc == 3)
+    {
+        struct timespec pause = {.tv_sec = 0, .tv_nsec = 100000000};
+        while (nanosleep(&pause, &pause) == -1 && errno == EINTR)
+        {
+        }
+        FILE *file = fopen("demanda.txt", "w");
+        if (file == NULL || fputs(argv[2], file) == EOF || fclose(file) == EOF)
+        {
+            return 20;
+        }
+        return raise(SIGSTOP) == 0 ? 0 : 21;
+    }
+    if (strcmp(argv[1], "demand_missing") == 0)
+    {
+        return raise(SIGSTOP) == 0 ? 0 : 21;
     }
     if (strcmp(argv[1], "exit7") == 0)
     {

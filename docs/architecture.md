@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06) e adaptação de processos (US07) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07) e leitura serializada da demanda (US08) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -88,6 +88,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   │   └── scheduler.{h,c}
 │   └── platform/
 │       ├── processes.{h,c}
+│       ├── demand.{h,c}
 │       ├── ipc.{h,c}
 │       ├── completion_file.{h,c}
 │       ├── terminal.{h,c}
@@ -96,6 +97,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── domain_test.c
 │   ├── scheduler_test.c
 │   ├── processes_test.c
+│   ├── demand_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -125,6 +127,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/app/workers.h` / `.c` | Expor e implementar as rotinas Recepção e Atendente e seus pontos de espera. |
 | `src/runtime/scheduler.h` / `.c` | Expor e implementar criação, despacho, cessão, espera, despertar e destruição dos contextos. |
 | `src/platform/processes.h` / `.c` | Definir eventos e encapsular criação, sinais, `waitpid`, máscaras e `pselect`. |
+| `src/platform/demand.h` / `.c` | Abrir o diretório da execução e manter uma única inicialização até a demanda ser validada e consumida. |
 | `src/platform/ipc.h` / `.c` | Definir e implementar propriedade, aquisição, liberação e limpeza de semáforos e bloqueio de instância. |
 | `src/platform/completion_file.h` / `.c` | Definir formato/operações e implementar inclusão e consumo ordenado de até dez PIDs. |
 | `src/platform/terminal.h` / `.c` | Definir e implementar leitura de s, entrada não bloqueante e restauração do terminal. |
@@ -132,6 +135,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/domain_test.c` | Cobrir fila, prioridade, prazo e métricas com tempos artificiais. |
 | `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
 | `tests/processes_test.c` | Cobrir criação, estados e recolhimento de filhos reais por meio da fixture. |
+| `tests/demand_test.c` | Cobrir a sessão de inicialização e a validação do arquivo com filhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados e falhas controladas nos testes; demandas serão acrescentadas na US08. |
 
@@ -210,6 +214,10 @@ Na US07, `processes_watcher_init` bloqueia `SIGCHLD` no pai e instala um handler
 `processes_spawn` exige caminho absoluto do executável, aceita diretório de trabalho explícito e devolve o PID após `fork`, sem esperar a inicialização do filho. O filho restaura a ação e a máscara originais de `SIGCHLD`, fecha descritores acima de 2 e então executa `execv`. Usa `close_range` quando disponível e percorre os descritores até o limite do pai em kernel sem essa chamada. Falhas de preparação ou `execv` saem com 127 e diagnóstico em `stderr`; o status 127 é tratado como falha, mas não distingue por si só uma saída 127 emitida pelo programa. `processes_send` rejeita PID não positivo para impedir sinalização de grupos. O observador restaura ação e máscara no fechamento; a aplicação deve recolher seus filhos antes de fechá-lo.
 
 Quando ambas esperam, `pselect` aguarda entrada e sinais. A máscara de sinais protege a passagem entre checagem da condição e espera, evitando notificações perdidas. Handlers somente registram flags `sig_atomic_t` e preservam `errno` quando necessário; não imprimem, alocam ou trocam contextos. Workers não usam `waitpid` bloqueante, `sem_wait`, `sleep` nem leitura bloqueante. Uma tentativa `sem_trywait` pode indicar indisponibilidade e levar a uma espera do runtime com evento de liberação definido. Antes de `exec`, o filho recebe máscaras, disposições e descritores adequados, sem herdar recursos desnecessários do pai.
+
+Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` recusa `demanda.txt` preexistente e uma segunda inicialização ativa, lê o relógio antes de `fork` e devolve PID e chegada relativos ao início informado pelo serviço. O caminho de trabalho do filho precisa designar o mesmo diretório aberto. O consumidor único de eventos chama `demand_observe` com o evento do PID ativo; somente a parada por `SIGSTOP` autoriza `demand_consume`. Uma saída antes da parada é erro e libera a sessão, mas o evento terminal já foi recolhido por `processes_collect`.
+
+`demand_consume` aceita um inteiro decimal não negativo em microssegundos, com no máximo uma quebra de linha final, verifica o intervalo de `uint64_t` e remove o arquivo somente após leitura válida. A sessão só libera uma nova criação após essa remoção. Erro de arquivo ou conteúdo mantém a sessão e o arquivo para diagnóstico; o serviço deve tratar a falha, cancelar/recolher o cliente parado e chamar `demand_abort`. O adaptador não enfileira clientes nem converte a demanda para milissegundos. A fixture controlada verifica o protocolo; a fonte oficial ainda precisa ser conferida na US21.
 
 ### Inicialização
 

@@ -101,3 +101,16 @@ Data: 2026-11-06. Ambiente: Linux x86_64/glibc; código próprio e fixture compi
 `processes_test.c` usa filhos reais da fixture para confirmar parada inicial, continuação, saída zero, saída com código 7, término por `SIGTERM`, falha de `execv` e diretório inexistente com saída 127. Também verifica máscara de `SIGCHLD` restaurada no filho, máscara adicional preservada, fechamento de descritor herdado, diretório de trabalho, rejeição de PID não positivo, restauração do handler e da máscara no pai, e fechamento repetido. Quatro filhos são observados com `waitid(..., WNOWAIT)` antes de uma única chamada a `processes_collect`, que recolhe os quatro; `waitpid` confirma `ECHILD` ao fim. Um segundo observador exercita `pselect` com `SIGCHLD` originalmente bloqueado. O diretório temporário criado pelo teste é removido.
 
 Falha real de `fork` não foi provocada: o módulo devolve erro sem modificar o PID de saída, mas a condição depende de limites do sistema e não foi alterada no ambiente de teste. Falhas das chamadas de configuração de sinais e o fallback de `close_range` para kernels antigos também não foram injetados. `execv` falho é identificado no pai por saída 127 e diagnóstico do filho; o mesmo código pode ser emitido por um programa executado. O cliente oficial e o serviço completo permanecem fora desta verificação; não há medição de satisfação ou duração do produto.
+
+## US08 — Demanda serializada
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; código próprio e fixture compilados em C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 30s make test` | Seis testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 40s make debug` | Seis testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+
+`demand_test.c` usa filhos reais e diretório temporário. Verificou que uma segunda criação é recusada enquanto há cliente `STARTING`, inclusive quando o primeiro atrasa a parada; leitura antes da parada e evento de PID alheio são recusados. Após `SIGSTOP` do PID correto, consumiu demandas diferentes em sequência, removeu o arquivo antes da nova criação e recolheu ambos os filhos. Demanda negativa foi recusada sem modificar a saída nem apagar o arquivo; arquivo ausente e saída antes da parada também produziram erro. Um arquivo preexistente foi preservado e impediu a criação. O teste removeu seu próprio diretório e não deixou filhos.
+
+A fixture controlada usa valores conhecidos; ainda não comprova compatibilidade com o cliente oficial. Falhas reais de relógio, `fork`, leitura parcial e remoção do arquivo não foram injetadas. A medição de chegada foi conferida apenas quanto à ordem e ao intervalo monotônico, sem avaliar satisfação ou desempenho do serviço.

@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US07 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US08 estão concluídas; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -174,6 +174,8 @@ Resultado: adaptadores testáveis sem executar todo o serviço.
 ### US08 — Ler a demanda sem misturar clientes
 
 **Tipo:** técnico · **Depende de:** US01, US07 · **Cobre:** R13–R14, R17; P01, P03, P05; D07, D10.
+
+**Estado:** concluída em 2026-11-08. `platform/demand` mantém uma sessão de inicialização por vez, captura a chegada antes do `fork`, aceita somente a parada do PID esperado e valida `demanda.txt` antes de liberar a criação seguinte. O teste com filhos reais e as limitações estão em [verification.md](verification.md#us08--demanda-serializada).
 
 **Entrega:** inicialização serializada dos clientes que compartilham `demanda.txt`.
 
