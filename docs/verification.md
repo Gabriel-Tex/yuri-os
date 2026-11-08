@@ -155,3 +155,17 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `analyst_test.c` criou o Analista como filho real e confirmou `analyst.pid`, parada inicial sem saída, um lote por `SIGCONT` e nova parada. Foram exercitados lotes de 0, 1, 10, 11 e 27 PIDs; a saída e a contagem restante corresponderam a cada despertar. O teste encerrou e recolheu o primeiro Analista. Um segundo Analista com `stdout` em `/dev/full` terminou com erro e preservou o PID pendente. Um terceiro encontrou linha inválida, terminou com erro e deixou o arquivo intacto. Os diagnósticos dessas duas falhas são esperados. O teste removeu os arquivos temporários e os semáforos próprios e confirmou ausência de filhos.
 
 Os PIDs usados como conteúdo são sintéticos; a criação e o recolhimento do Analista são reais. A política de despertar e a drenagem automática do serviço pertencem à US12 e à integração posterior. O cliente oficial e as métricas do serviço ainda não foram exercitados.
+
+## US12 — Coordenação e drenagem
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 40s make test` | Dez testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 50s make debug` | Dez testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `timeout 60s bash -c 'make -s build/analyst_coordinator_test && for iteration in {1..20}; do ./build/analyst_coordinator_test /home/gabriel/S5/SO-yuri/build/analyst >/dev/null || exit 1; done'` | Vinte execuções consecutivas passaram; o watchdog não disparou. |
+
+`analyst_coordinator_test.c` usou o Analista real, um observador de processos e duas threads de usuário. A drenagem começou com 27 PIDs sintéticos e confirmou lotes de 10, 10 e 7; um PID recebido durante lote ativo aguardou o evento do runtime e formou um último lote de 1. Um segundo `SIGCONT` enquanto o Analista estava ativo não foi enviado. A Recepção progrediu nesse intervalo, sem aguardar o arquivo. A conclusão exigiu arquivo vazio e parada confirmada. O teste recolheu o primeiro Analista e verificou saída ordenada de 28 PIDs; um segundo Analista imprimiu um lote parcial por ociosidade, recusou um despertar repetido durante o lote e, ao morrer por sinal em outro lote, foi reconhecido como erro. O `SIGKILL` durante a compactação deixou um arquivo temporário em uma repetição; após recolher o filho, o teste removeu esse artefato do seu diretório isolado. Não restaram filhos ou semáforos próprios.
+
+A coordenação foi exercitada como módulo de aplicação isolado. A geração de clientes, o atendimento completo, o comando `s` e a integração com o cliente oficial pertencem às histórias seguintes. Não houve medição de satisfação ou duração do serviço.

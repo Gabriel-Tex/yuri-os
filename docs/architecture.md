@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10) e processo Analista (US11) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11) e coordenação dos lotes (US12) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -84,6 +84,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   │   └── metrics.{h,c}
 │   ├── app/
 │   │   ├── service.{h,c}
+│   │   ├── analyst_coordinator.{h,c}
 │   │   └── workers.{h,c}
 │   ├── runtime/
 │   │   └── scheduler.{h,c}
@@ -102,6 +103,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── ipc_test.c
 │   ├── completion_file_test.c
 │   ├── analyst_test.c
+│   ├── analyst_coordinator_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -128,6 +130,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/domain/client_queue.h` / `.c` | Expor e implementar reserva, inserção, capacidade e seleção EDF da fila. |
 | `src/domain/metrics.h` / `.c` | Expor e implementar contadores, satisfação e taxa com instantes fornecidos pela aplicação. |
 | `src/app/service.h` / `.c` | Definir configuração/resultado e coordenar eventos, recursos, estado da execução e finalização. |
+| `src/app/analyst_coordinator.h` / `.c` | Associar eventos do Analista a despertares, inclusão de PIDs e drenagem. |
 | `src/app/workers.h` / `.c` | Expor e implementar as rotinas Recepção e Atendente e seus pontos de espera. |
 | `src/runtime/scheduler.h` / `.c` | Expor e implementar criação, despacho, cessão, espera, despertar e destruição dos contextos. |
 | `src/platform/processes.h` / `.c` | Definir eventos e encapsular criação, sinais, `waitpid`, máscaras e `pselect`. |
@@ -143,6 +146,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/ipc_test.c` | Cobrir exclusão de instância, semáforos e limpeza parcial com recursos POSIX reais. |
 | `tests/completion_file_test.c` | Cobrir inclusão, validação, saída e compactação dos PIDs sob proteção. |
 | `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
+| `tests/analyst_coordinator_test.c` | Cobrir política de despertar e drenagem com Analista e runtime reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
@@ -270,6 +274,8 @@ Na US10, `completion_file_open` cria `completed.log` somente se ausente no servi
 Na US11, `analyst` recebe o diretório absoluto da execução, abre `/sem_block` e `completed.log` já criados, grava seu próprio PID em `analyst.pid` com criação exclusiva e para com `SIGSTOP`. A cada `SIGCONT` recebido enquanto parado, adquire o semáforo, imprime um lote de no máximo dez PIDs, libera a proteção e para novamente. Erro de arquivo, saída ou semáforo é diagnosticado em `stderr` e termina com código não zero; `SIGPIPE` é ignorado para que erro de escrita seja tratado. O serviço permanece responsável por comparar o PID do arquivo com o filho que criou, confirmar cada parada e recolher o processo.
 
 Não acrescentar PIDs enquanto o Analista consome um lote. Se um cliente terminar nesse intervalo, o Atendente guarda a conclusão pendente até a nova parada; a Recepção ainda pode progredir. Para 27 pendências, a drenagem precisa confirmar lotes de 10, 10 e 7 e verificar o arquivo vazio. Falha de saída ou arquivo encerra com erro; um sinal enviado não é confirmação de impressão. Não há recuperação transacional após crash entre impressão e compactação, que poderia duplicar uma saída.
+
+Na US12, o serviço fornece PID do filho, `completion_file` e `scheduler` ao `analyst_coordinator`. O consumidor único de eventos encaminha as mudanças desse PID ao coordenador. A primeira parada confirma `analyst.pid` e lê a quantidade pendente. Dez PIDs, ociosidade com pendências ou drenagem solicitada autorizam `SIGCONT` somente no estado parado. Enquanto o Analista está ativo, `try_append` não bloqueia nem grava; o Atendente conserva o PID e pode esperar `ANALYST_COORDINATOR_EVENT`, permitindo à Recepção progredir. A parada seguinte confirma que o arquivo perdeu exatamente o lote esperado antes de autorizar outro despertar. A drenagem exige estado parado, contador zero e arquivo vazio. Saída do Analista antes da finalização esperada é erro. O teste cobre esses estados com processo e duas threads de usuário reais; a ligação ao serviço completo pertence à US13–US16.
 
 ### Encerramento
 
