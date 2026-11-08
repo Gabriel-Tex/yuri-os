@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define SERVICE_X_MAX_MS (UINT64_MAX / UINT64_C(1000000))
 
@@ -78,6 +79,33 @@ static bool service_find_paths(char **root_out, char **analyst_out)
     return true;
 }
 
+static char *service_find_client(const char *analyst)
+{
+    const char *override = getenv("SERVICE_CLIENT_PATH");
+    if (override != NULL && override[0] != '\0') {
+        if (override[0] != '/') {
+            errno = EINVAL;
+            return NULL;
+        }
+        return realpath(override, NULL);
+    }
+    const char *slash = strrchr(analyst, '/');
+    if (slash == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+    size_t directory_length = (size_t)(slash - analyst);
+    char *candidate = malloc(directory_length + sizeof("/client"));
+    if (candidate == NULL) return NULL;
+    memcpy(candidate, analyst, directory_length);
+    memcpy(candidate + directory_length, "/client", sizeof("/client"));
+    char *client = realpath(candidate, NULL);
+    int error = errno;
+    free(candidate);
+    errno = error;
+    return client;
+}
+
 struct service_stub_steps {
     unsigned reception;
     unsigned attendant;
@@ -127,6 +155,58 @@ int main(int argc, char **argv)
                                     .max_patience_ms = patience_ms,
                                     .project_root = root,
                                     .analyst_path = analyst};
+    if (count > 0) {
+        char *client_path = service_find_client(analyst);
+        if (client_path == NULL || access(client_path, X_OK) == -1) {
+            int error = errno;
+            free(client_path);
+            free(root);
+            free(analyst);
+            errno = error;
+            perror("service: cliente não disponível");
+            return EXIT_FAILURE;
+        }
+        struct service_state finite_service = {0};
+        struct service_result finite_result = {0};
+        bool prepared_finite = service_prepare(&finite_service, &config);
+        int error = prepared_finite ? 0 : errno;
+        bool ran_finite = false;
+        if (prepared_finite) {
+            ran_finite = service_run_finite(&finite_service, client_path,
+                                            &finite_result);
+            if (!ran_finite) error = errno;
+        }
+        bool closed_finite = service_close(&finite_service, &finite_result);
+        if (!closed_finite && error == 0) error = errno;
+        free(client_path);
+        free(root);
+        free(analyst);
+        if (!prepared_finite || !ran_finite || !closed_finite ||
+            !finite_result.complete) {
+            errno = error != 0 ? error : EPROTO;
+            perror("service: execução finita");
+            if (prepared_finite && !ran_finite) {
+                fprintf(stderr, "service: execução parcial: criados=%" PRIu64
+                        ", concluídos=%" PRIu64 ", cancelados=%" PRIu64
+                        ", falhos=%" PRIu64 "\n", finite_result.created,
+                        finite_result.completed, finite_result.cancelled,
+                        finite_result.failed);
+            }
+            return EXIT_FAILURE;
+        }
+        printf("criados: %" PRIu64 "\nconcluídos: %" PRIu64
+               "\nsatisfeitos: %" PRIu64 "\ninsatisfeitos: %" PRIu64
+               "\ntaxa de satisfação: %" PRIu64 "/%" PRIu64 " (%.2f%%)\n"
+               "tempo total: %.3f ms\n",
+               finite_result.created, finite_result.completed,
+               finite_result.satisfied,
+               finite_result.completed - finite_result.satisfied,
+               finite_result.satisfied, finite_result.created,
+               100.0 * (double)finite_result.satisfied /
+                   (double)finite_result.created,
+               (double)finite_result.elapsed_ns / 1000000.0);
+        return fflush(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
     struct service_state service = {0};
     struct service_result result = {0};
     bool prepared = service_prepare(&service, &config);
@@ -160,6 +240,6 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     /* A CLI não informa sucesso acadêmico antes de integrar o atendimento. */
-    fprintf(stderr, "service: entrada aceita e recursos preparados; atendimento pendente (US15–US16)\n");
+    fprintf(stderr, "service: entrada aceita e recursos preparados; modo infinito pendente (US17–US18)\n");
     return 2;
 }

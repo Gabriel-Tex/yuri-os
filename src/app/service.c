@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "service.h"
+#include "workers.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -170,6 +171,88 @@ bool service_prepare(struct service_state *service,
     return true;
 }
 
+bool service_run_finite(struct service_state *service, const char *client_path,
+                        struct service_result *result)
+{
+    if (service == NULL || !service->initialized ||
+        service->config.client_count == 0 || client_path == NULL ||
+        client_path[0] != '/' || result == NULL) {
+        errno = EINVAL;
+        return false;
+    }
+    struct client_queue queue;
+    struct metrics metrics;
+    struct workers_reception reception = {0};
+    struct workers_attendant attendant = {0};
+    bool stop_requested = false;
+    bool reception_ready = false;
+    bool attendant_ready = false;
+    bool succeeded = false;
+    int error = 0;
+    char *client_argv[] = {(char *)client_path, NULL};
+    if (!client_queue_init(&queue) || !metrics_init(&metrics) ||
+        !workers_attendant_init(&attendant, service, &queue, &metrics,
+                                &reception.finished)) {
+        return false;
+    }
+    attendant_ready = true;
+    reception_ready = true;
+    if (!workers_reception_init(&reception, service, &queue, &metrics,
+                                client_path, client_argv, &stop_requested)) {
+        error = errno;
+        goto cleanup;
+    }
+    reception.other_handler = workers_attendant_on_event;
+    reception.other_context = &attendant;
+    if (!scheduler_create(&service->scheduler, 0, workers_reception_run,
+                          &reception) ||
+        !scheduler_create(&service->scheduler, 1, workers_attendant_run,
+                          &attendant) ||
+        !scheduler_run_events(&service->scheduler, service_process_events,
+                              service_wait_events, service)) {
+        error = errno;
+        goto cleanup;
+    }
+    double rate;
+    if (!reception.finished || !attendant.finished ||
+        queue.count != 0 || queue.reserved ||
+        !metrics_finite_rate(&metrics, service->config.client_count,
+                             &rate)) {
+        error = EPROTO;
+        goto cleanup;
+    }
+    if (!analyst_coordinator_request_drain(&service->coordinator)) {
+        error = errno;
+        goto cleanup;
+    }
+    bool drained = false;
+    while (!drained) {
+        if (!service_process_events(service) ||
+            !analyst_coordinator_is_drained(&service->coordinator, &drained) ||
+            (!drained && !service_wait_events(service))) {
+            error = errno;
+            goto cleanup;
+        }
+    }
+    succeeded = true;
+cleanup:
+    if (attendant_ready && !workers_attendant_close(&attendant) && error == 0)
+        error = errno;
+    if (reception_ready && !workers_reception_close(&reception) && error == 0)
+        error = errno;
+    result->created = metrics.created;
+    result->completed = metrics.completed;
+    result->satisfied = metrics.satisfied;
+    result->cancelled = metrics.cancelled;
+    result->failed = metrics.failed;
+    result->complete = succeeded && error == 0;
+    if (!result->complete) {
+        errno = error != 0 ? error : EPROTO;
+        return false;
+    }
+    return true;
+}
+
 static void service_on_cleanup_event(void *context,
                                       const struct processes_event *event)
 {
@@ -223,6 +306,8 @@ bool service_close(struct service_state *service, struct service_result *result)
                 errno != ENOENT && error == 0) error = errno;
             if (unlinkat(directory_fd, COMPLETION_FILE_NAME, 0) == -1 &&
                 errno != ENOENT && error == 0) error = errno;
+            if (unlinkat(directory_fd, DEMAND_FILE_NAME, 0) == -1 &&
+                errno != ENOENT && error == 0) error = errno;
             if (close(directory_fd) == -1 && error == 0) error = errno;
         } else if (error == 0) {
             error = errno;
@@ -239,7 +324,6 @@ bool service_close(struct service_state *service, struct service_result *result)
             if (error == 0) error = errno;
         } else {
             result->prepared = service->initialized;
-            result->complete = false;
         }
     }
     service->initialized = false;

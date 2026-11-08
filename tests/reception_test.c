@@ -182,12 +182,12 @@ static void run_invalid_case(const char *analyst_path,
     CHECK(workers_reception_close(&harness.reception));
     CHECK(!harness.queue.reserved);
     CHECK(harness.metrics.created == 1 && harness.metrics.cancelled == 1);
-    CHECK(!service_close(&harness.service, NULL) && errno == ENOTEMPTY);
     char demand_path[320];
     CHECK(snprintf(demand_path, sizeof(demand_path), "%s/demanda.txt",
                    run_directory) > 0);
-    CHECK(unlink(demand_path) == 0);
-    CHECK(rmdir(run_directory) == 0);
+    CHECK(access(demand_path, F_OK) == 0);
+    CHECK(service_close(&harness.service, NULL));
+    CHECK(access(run_directory, F_OK) == -1 && errno == ENOENT);
     int status;
     CHECK(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
     char run_root[256];

@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define DEMAND_FILE "demanda.txt"
 #define DEMAND_MAX_BYTES 32
 
 bool demand_init(struct demand_startup *startup, const char *directory)
@@ -65,7 +64,7 @@ bool demand_begin(struct demand_startup *startup,
         errno = EINVAL;
         return false;
     }
-    if (fstatat(startup->directory_fd, DEMAND_FILE, &file_status,
+    if (fstatat(startup->directory_fd, DEMAND_FILE_NAME, &file_status,
                 AT_SYMLINK_NOFOLLOW) == 0) {
         errno = EEXIST;
         return false;
@@ -123,7 +122,7 @@ bool demand_consume(struct demand_startup *startup, uint64_t *demand_us)
         errno = EINVAL;
         return false;
     }
-    int fd = openat(startup->directory_fd, DEMAND_FILE,
+    int fd = openat(startup->directory_fd, DEMAND_FILE_NAME,
                     O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd == -1) {
         return false;
@@ -179,7 +178,7 @@ bool demand_consume(struct demand_startup *startup, uint64_t *demand_us)
         }
         value = value * 10 + digit;
     }
-    if (unlinkat(startup->directory_fd, DEMAND_FILE, 0) == -1) {
+    if (unlinkat(startup->directory_fd, DEMAND_FILE_NAME, 0) == -1) {
         return false;
     }
     *demand_us = value;

@@ -1,19 +1,19 @@
 # yuri-os
 
-Este repositório contém o início da implementação da primeira parte do trabalho prático: um atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário. O cliente fornecido pelo professor e o processo Analista compõem o fluxo planejado. A implementação usa C17 para Linux/glibc.
+Este repositório implementa o fluxo finito da primeira parte do trabalho prático: atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário e um processo Analista. A implementação usa C17 para Linux/glibc.
 
-US01–US15 estão implementadas como módulos: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção e Atendente. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A execução finita integrada e a conferência do cliente oficial continuam pendentes; `service N X` ainda valida e prepara a execução.
+US01–US16 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente e relatório finito. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21. O modo infinito com comando `s` permanece nas US17–US18.
 
 Para compilar e verificar o domínio, instale um compilador C17 e GNU Make:
 
 ```sh
-make          # Compila doze testes C, a fixture, `analyst` e `service` em build/.
-make test     # Executa os doze testes C e o teste da CLI, inclusive filhos reais e semáforos.
+make          # Compila quatorze testes C, a fixture, `analyst` e `service` em build/.
+make test     # Executa os testes C e da CLI, inclusive filhos reais e semáforos.
 make debug    # Compila e testa com -O0 -g3 em build/debug/.
 make clean    # Remove somente build/; preserva fontes e run/.
 ```
 
-`CC`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS` e `LDLIBS` podem ser fornecidos ao Make; C17 e os avisos `-Wall -Wextra -Wpedantic` são acrescentados à compilação. Objetos, dependências de cabeçalhos e binários ficam em `build/`, ignorado pelo Git junto a `run/`. `build/controlled_client` é apenas uma fixture de teste, não o cliente do professor. A Recepção já gera clientes em testes isolados. O executável `service N X` valida a entrada e prepara os recursos, mas retorna código 2 com diagnóstico enquanto o atendimento não está integrado; não apresenta taxa ou conclusão fictícia. O cliente oficial será integrado na US21.
+`CC`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS` e `LDLIBS` podem ser fornecidos ao Make; C17 e os avisos `-Wall -Wextra -Wpedantic` são acrescentados à compilação. Objetos, dependências de cabeçalhos e binários ficam em `build/`, ignorado pelo Git junto a `run/`. `build/controlled_client` é apenas uma fixture de teste, não o cliente do professor. Para N > 0, `build/service N X` procura `build/client`; enquanto ele não estiver presente, a execução informa erro. Os testes indicam explicitamente `SERVICE_CLIENT_PATH=/caminho/absoluto/build/controlled_client`, sem alterar o contrato de argumentos do serviço. O relatório finito aparece depois dos PIDs e da limpeza, com criados, concluídos, satisfeitos, insatisfeitos, taxa satisfeitos/N e tempo total em milissegundos. Para N = 0, a CLI ainda retorna código 2 com diagnóstico, pois a parada por `s` não foi integrada.
 
 - [Arquitetura](docs/architecture.md): requisitos, decisões técnicas, módulos, fluxos e tratamento de recursos.
 - [Histórias de usuário](docs/user-stories.md): ordem de desenvolvimento, critérios de aceitação e rastreabilidade.

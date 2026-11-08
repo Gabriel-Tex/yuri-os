@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define DEMAND_FILE_NAME "demanda.txt"
+
 struct demand_startup {
     int directory_fd;
     pid_t pid;

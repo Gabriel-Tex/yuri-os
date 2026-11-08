@@ -22,6 +22,9 @@ struct service_config {
 struct service_result {
     uint64_t created;
     uint64_t completed;
+    uint64_t satisfied;
+    uint64_t cancelled;
+    uint64_t failed;
     uint64_t elapsed_ns;
     bool prepared;
     bool complete;
@@ -53,6 +56,10 @@ bool service_prepare(struct service_state *service,
                      const struct service_config *config);
 bool service_process_events(void *context);
 bool service_wait_events(void *context);
+/* Executa N > 0 com o cliente indicado; exige todos os atendimentos e drena
+ * o arquivo antes de devolver sucesso. A liberação final é service_close. */
+bool service_run_finite(struct service_state *service, const char *client_path,
+                        struct service_result *result);
 bool service_close(struct service_state *service, struct service_result *result);
 
 #endif

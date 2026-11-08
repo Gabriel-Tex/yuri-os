@@ -292,7 +292,7 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Tipo:** funcional · **Depende de:** US03, US06, US09 · **Cobre:** R01–R03; D01, D09, D13.
 
-**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI aceita a configuração, inicia e libera recursos, mas termina com código 2 antes do atendimento para não apresentar um finito incompleto como sucesso. A geração e o laço N = 0 foram verificados em US14 com Atendente controlado; a ligação à CLI, o atendimento e o comando `s` ainda impedem declarar a execução integrada concluída.
+**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI finita foi ligada ao atendimento na US16. N = 0 ainda termina com código 2 após preparar e liberar recursos, pois a leitura de `s` e o encerramento infinito pertencem às US17–US18.
 
 **História:** como executor, quero informar N e X e receber erro claro quando a configuração for inválida.
 
@@ -373,6 +373,8 @@ Resultado: executar o modo finito do início ao relatório.
 3. Recolher o Analista, liberar recursos e imprimir o relatório.
 
 **Verificação:** N = 1, 11 e > 100; cada PID concluído aparece uma vez na execução normal, satisfeitos + insatisfeitos = N e nenhum filho permanece.
+
+**Estado:** concluída em 2026-11-08 com o cliente controlado, conforme [verification.md](verification.md#us16--execução-finita-e-relatório). A CLI resolve `client` ao lado do serviço e pode receber um caminho absoluto explícito por `SERVICE_CLIENT_PATH` nos testes. A compatibilidade com a fonte oficial ainda depende da US21.
 
 ## E06 — Interrupção e falhas
 

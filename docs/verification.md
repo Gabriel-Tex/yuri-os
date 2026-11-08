@@ -195,7 +195,7 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 
 `reception_test.c` usou o cliente controlado e um Atendente de teste que retira e cancela um cliente por vez, sem simular sucesso de atendimento. A Recepção criou exatamente 1 e 125 clientes nos cenários finitos. Em N = 0, continuou até a parada controlada após pelo menos 205 criações. Com a fila cheia, a geração aguardou a liberação de uma vaga; a ocupação nunca ultrapassou 100, incluindo a reserva de `STARTING`. A Recepção registrou criação antes da fila, observou a parada inicial, leu a demanda e enfileirou apenas registros completos; o teste conferiu demanda em microssegundos e paciência de 2,5/5 ms para X = 5. A função de mapeamento da prioridade foi conferida em 256 padrões de bits (128 para cada classe), sem exigir divisão exata numa amostra aleatória.
 
-Uma demanda inválida produziu erro sem inserção na fila. A limpeza cancelou e recolheu o filho parado, liberou a reserva e preservou `demanda.txt` para diagnóstico até o teste removê-lo do diretório próprio. Nenhum filho ou semáforo criado pelo teste permaneceu. O cliente oficial não foi usado; a CLI do produto ainda não liga a Recepção ao Atendente real. Não houve medição de satisfação ou duração do serviço, nem alegação de ganho de desempenho.
+Uma demanda inválida produziu erro sem inserção na fila. A limpeza cancelou e recolheu o filho parado e liberou a reserva. `demanda.txt` permaneceu disponível até o fechamento controlado do serviço, que agora o remove junto ao diretório próprio. Nenhum filho ou semáforo criado pelo teste permaneceu. O cliente oficial não foi usado; a CLI do produto ainda não ligava a Recepção ao Atendente real nesta etapa. Não houve medição de satisfação ou duração do serviço, nem alegação de ganho de desempenho.
 
 ## US15 — Atendimento confirmado
 
@@ -207,3 +207,15 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall`, `-Wextra` e `-W
 | `timeout 100s make debug` | Os mesmos testes passaram com `-O0 -g3`, sem avisos; watchdog não disparou. |
 
 `attendant_test.c` inseriu um cliente já parado diretamente na fila, com prazo vencido. A fixture atrasou 30 ms antes de adquirir `/sem_atend` e saiu normalmente após o serviço; o Atendente esperou a saída, registrou um concluído e zero satisfeitos, o Analista imprimiu o PID e a drenagem confirmou arquivo vazio. Outra fixture terminou por sinal após `SIGCONT`; não houve conclusão nem PID registrado, e a limpeza marcou uma falha e recolheu o filho. O teste também verificou ausência de filhos remanescentes. O estado ativo do Analista e a preservação de PIDs durante seu lote foram exercitados no teste real da US12; a integração com geração simultânea e relatório é verificada na US16. O cliente oficial permanece indisponível.
+
+## US16 — Execução finita e relatório
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall`, `-Wextra` e `-Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 100s make test` | Quatorze testes C e dois testes da CLI passaram com `-O2 -g`, sem avisos; watchdog não disparou. |
+| `timeout 110s make debug` | Os mesmos testes passaram com `-O0 -g3`, sem avisos; watchdog não disparou. |
+| `timeout 90s bash -c 'for iteration in {1..10}; do bash ./tests/finite_service_test.sh /home/gabriel/S5/SO-yuri/build/service /home/gabriel/S5/SO-yuri/build/controlled_client >/dev/null || exit 1; done'` | Dez repetições dos três tamanhos passaram; watchdog não disparou. |
+
+`finite_service_test.sh` iniciou a CLI a partir de `/tmp`, indicando explicitamente a fixture por `SERVICE_CLIENT_PATH`, para N = 1, 11 e 125, com X = 10000 ms. Em cada execução, contou N linhas de PID distintas antes do relatório, confirmou criados = concluídos = N e satisfeitos + insatisfeitos = N, fração da taxa coerente e tempo total positivo. N = 11 e N = 125 exigiram drenagem do lote parcial; N = 125 passou pelo limite da fila. `finite_service_test.c` executou o fluxo de 11 clientes dentro do processo de teste, confirmou resultado completo, ausência de filhos após o fechamento e remoção de `/sem_atend` e `/sem_block`. Uma falha de `exec` após o `fork` foi recusada sem relatório completo nem filho remanescente. A suíte também manteve os testes de saída por sinal e demanda inválida. Os valores de satisfação e duração dependem da carga e não foram usados como comparação de desempenho. O cliente oficial permanece indisponível, portanto sua compatibilidade não foi verificada.
