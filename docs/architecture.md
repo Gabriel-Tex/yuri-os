@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11) e coordenação dos lotes (US12) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11), coordenação dos lotes (US12) e preparação do serviço (US13) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -104,6 +104,8 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── completion_file_test.c
 │   ├── analyst_test.c
 │   ├── analyst_coordinator_test.c
+│   ├── service_test.c
+│   ├── service_cli_test.sh
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -147,6 +149,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/completion_file_test.c` | Cobrir inclusão, validação, saída e compactação dos PIDs sob proteção. |
 | `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
 | `tests/analyst_coordinator_test.c` | Cobrir política de despertar e drenagem com Analista e runtime reais. |
+| `tests/service_test.c` / `service_cli_test.sh` | Cobrir preparação, limpeza e validação da entrada com caminhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
@@ -231,6 +234,8 @@ Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` 
 `demand_consume` aceita um inteiro decimal não negativo em microssegundos, com no máximo uma quebra de linha final, verifica o intervalo de `uint64_t` e remove o arquivo somente após leitura válida. A sessão só libera uma nova criação após essa remoção. Erro de arquivo ou conteúdo mantém a sessão e o arquivo para diagnóstico; o serviço deve tratar a falha, cancelar/recolher o cliente parado e chamar `demand_abort`. O adaptador não enfileira clientes nem converte a demanda para milissegundos. A fixture controlada verifica o protocolo; a fonte oficial ainda precisa ser conferida na US21.
 
 Na US09, `ipc_service_init` mantém um lock com `flock` em `/tmp/service-simulator-<uid>.lock` durante a execução. O inode permanece após o fechamento para impedir que duas instâncias bloqueiem arquivos diferentes. O serviço cria `/sem_atend` e `/sem_block` com `O_CREAT | O_EXCL`, valor inicial 1 e posse registrada; recurso já existente causa erro sem remoção. `ipc_service_close` fecha handles, remove apenas os nomes criados por esta instância e aceita repetição ou falha parcial. A tentativa `ipc_try_acquire` devolve ocupado sem bloquear em `EAGAIN`; o serviço coordena a espera por evento fora do adaptador. Clientes e Analista podem abrir os nomes existentes sem adquirir sua propriedade. O teste isolado cobre exclusão e limpeza; a integração com o atendimento pertence às histórias posteriores.
+
+Na US13, `service_main` aceita apenas dígitos decimais para N e X, rejeita sinais, sufixos e overflow, e limita X ao maior valor conversível para nanossegundos. O caminho absoluto do executável identifica o projeto e o `analyst` irmão, independentemente do diretório corrente ou de espaços no caminho. `service_prepare` inicia o relógio, adquire IPC, cria `run/execution-XXXXXX`, abre `completed.log`, prepara o escalonador, cria o Analista e confirma sua parada inicial. `service_process_events` é o único consumidor de `waitpid` e pode encaminhar eventos de cliente a um callback da aplicação. A CLI inicia duas rotinas distintas para verificar o runtime e libera os recursos em ordem controlada. Até a integração do atendimento, uma entrada válida termina com código 2 e diagnóstico explícito, sem relatório de sucesso ou taxa; N = 0 já é representado na configuração, mas o laço contínuo pertence à US14 e a parada por `s` à US17–US18.
 
 ### Inicialização
 

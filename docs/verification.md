@@ -169,3 +169,16 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `analyst_coordinator_test.c` usou o Analista real, um observador de processos e duas threads de usuário. A drenagem começou com 27 PIDs sintéticos e confirmou lotes de 10, 10 e 7; um PID recebido durante lote ativo aguardou o evento do runtime e formou um último lote de 1. Um segundo `SIGCONT` enquanto o Analista estava ativo não foi enviado. A Recepção progrediu nesse intervalo, sem aguardar o arquivo. A conclusão exigiu arquivo vazio e parada confirmada. O teste recolheu o primeiro Analista e verificou saída ordenada de 28 PIDs; um segundo Analista imprimiu um lote parcial por ociosidade, recusou um despertar repetido durante o lote e, ao morrer por sinal em outro lote, foi reconhecido como erro. O `SIGKILL` durante a compactação deixou um arquivo temporário em uma repetição; após recolher o filho, o teste removeu esse artefato do seu diretório isolado. Não restaram filhos ou semáforos próprios.
 
 A coordenação foi exercitada como módulo de aplicação isolado. A geração de clientes, o atendimento completo, o comando `s` e a integração com o cliente oficial pertencem às histórias seguintes. Não houve medição de satisfação ou duração do serviço.
+
+## US13 — Entrada e preparação
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 50s make test` | Testes existentes, `service_test` e `service_cli_test.sh` passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 55s make debug` | Os mesmos testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+
+`service_cli_test.sh` rejeitou falta de argumentos, extras, sinal, zero em X, sufixos e overflow. Uma configuração finita e N = 0 foram reconhecidas a partir de outro diretório por um caminho com espaços. Ambas retornaram código 2 após preparar os recursos, sem alegar atendimento concluído. `service_test.c` preparou um diretório com espaços, confirmou o Analista parado e duas rotinas com contextos distintos, depois recolheu o filho e liberou semáforos, arquivo e diretório próprios. Falha de `exec` e diretório `run` ocupado por arquivo foram recusados sem filhos remanescentes.
+
+A primeira execução de `service_test` revelou estado do Analista não reinicializado após o fechamento; o descritor foi corrigido e a suíte repetida passou. A CLI ainda não gera nem atende clientes: a execução finita e o laço contínuo N = 0 dependem de US14–US18. Portanto não há relatório, taxa ou tempo total do produto nesta verificação. O cliente oficial permanece indisponível.
