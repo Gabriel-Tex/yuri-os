@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07) e leitura serializada da demanda (US08) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08) e IPC (US09) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -50,6 +50,7 @@ O PDF ilustra o cliente, mas o ZIP não contém um arquivo `client.c` independen
 | D07 | No máximo um cliente em inicialização e um em atendimento. | Proteger a demanda compartilhada e representar o único Atendente. |
 | D08 | Ao receber s, concluir o atendimento atual, cancelar os demais e drenar os PIDs. | Definir um encerramento verificável e o denominador da taxa. |
 | D09 | Dados em `run/<execution-id>/` e somente uma instância ativa. | Isolar arquivos locais enquanto o cliente usa semáforo de nome global. |
+| D10 | Consumir a demanda decimal de um cliente parado antes de criar o próximo. | Impedir associação cruzada no arquivo compartilhado e conservar o dado original do cliente. |
 | D11 | Tempo monotônico em nanossegundos; conclusão no instante observado pelo pai. | Preservar X/2 quando X for ímpar e evitar saltos do relógio civil. |
 | D12 | Despertar o Analista com dez PIDs, na ociosidade com pendências ou na drenagem. | Escoar o arquivo sem exigir impressão após cada atendimento. |
 | D13 | Aceitar N inteiro não negativo e X inteiro positivo em ms; rejeitar conversão com overflow. | Definir uma CLI sem cálculos inválidos; rejeitar X = 0 é decisão de validação. |
@@ -98,6 +99,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── scheduler_test.c
 │   ├── processes_test.c
 │   ├── demand_test.c
+│   ├── ipc_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -136,8 +138,9 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
 | `tests/processes_test.c` | Cobrir criação, estados e recolhimento de filhos reais por meio da fixture. |
 | `tests/demand_test.c` | Cobrir a sessão de inicialização e a validação do arquivo com filhos reais. |
+| `tests/ipc_test.c` | Cobrir exclusão de instância, semáforos e limpeza parcial com recursos POSIX reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
-| `tests/fixtures/controlled_client.c` | Produzir estados e falhas controladas nos testes; demandas serão acrescentadas na US08. |
+| `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
 ### Limites dos módulos
 
@@ -218,6 +221,8 @@ Quando ambas esperam, `pselect` aguarda entrada e sinais. A máscara de sinais p
 Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` recusa `demanda.txt` preexistente e uma segunda inicialização ativa, lê o relógio antes de `fork` e devolve PID e chegada relativos ao início informado pelo serviço. O caminho de trabalho do filho precisa designar o mesmo diretório aberto. O consumidor único de eventos chama `demand_observe` com o evento do PID ativo; somente a parada por `SIGSTOP` autoriza `demand_consume`. Uma saída antes da parada é erro e libera a sessão, mas o evento terminal já foi recolhido por `processes_collect`.
 
 `demand_consume` aceita um inteiro decimal não negativo em microssegundos, com no máximo uma quebra de linha final, verifica o intervalo de `uint64_t` e remove o arquivo somente após leitura válida. A sessão só libera uma nova criação após essa remoção. Erro de arquivo ou conteúdo mantém a sessão e o arquivo para diagnóstico; o serviço deve tratar a falha, cancelar/recolher o cliente parado e chamar `demand_abort`. O adaptador não enfileira clientes nem converte a demanda para milissegundos. A fixture controlada verifica o protocolo; a fonte oficial ainda precisa ser conferida na US21.
+
+Na US09, `ipc_service_init` mantém um lock com `flock` em `/tmp/service-simulator-<uid>.lock` durante a execução. O inode permanece após o fechamento para impedir que duas instâncias bloqueiem arquivos diferentes. O serviço cria `/sem_atend` e `/sem_block` com `O_CREAT | O_EXCL`, valor inicial 1 e posse registrada; recurso já existente causa erro sem remoção. `ipc_service_close` fecha handles, remove apenas os nomes criados por esta instância e aceita repetição ou falha parcial. A tentativa `ipc_try_acquire` devolve ocupado sem bloquear em `EAGAIN`; o serviço coordena a espera por evento fora do adaptador. Clientes e Analista podem abrir os nomes existentes sem adquirir sua propriedade. O teste isolado cobre exclusão e limpeza; a integração com o atendimento pertence às histórias posteriores.
 
 ### Inicialização
 

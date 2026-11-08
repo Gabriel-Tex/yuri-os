@@ -13,13 +13,14 @@ CLOCK_OBJECT = $(BUILD_DIR)/src/platform/clock.o
 SCHEDULER_OBJECT = $(BUILD_DIR)/src/runtime/scheduler.o
 PROCESSES_OBJECT = $(BUILD_DIR)/src/platform/processes.o
 DEMAND_OBJECT = $(BUILD_DIR)/src/platform/demand.o
+IPC_OBJECT = $(BUILD_DIR)/src/platform/ipc.o
 CONTROLLED_CLIENT_OBJECT = $(BUILD_DIR)/tests/fixtures/controlled_client.o
-TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o
-DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d)
+TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o $(BUILD_DIR)/tests/ipc_test.o
+DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d)
 
 .PHONY: all test debug clean
 
-all: $(BUILD_DIR)/domain_test $(BUILD_DIR)/client_queue_test $(BUILD_DIR)/metrics_test $(BUILD_DIR)/scheduler_test $(BUILD_DIR)/controlled_client $(BUILD_DIR)/processes_test $(BUILD_DIR)/demand_test
+all: $(BUILD_DIR)/domain_test $(BUILD_DIR)/client_queue_test $(BUILD_DIR)/metrics_test $(BUILD_DIR)/scheduler_test $(BUILD_DIR)/controlled_client $(BUILD_DIR)/processes_test $(BUILD_DIR)/demand_test $(BUILD_DIR)/ipc_test
 
 $(BUILD_DIR)/domain_test: $(CLIENT_OBJECT) $(BUILD_DIR)/tests/domain_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
@@ -42,6 +43,9 @@ $(BUILD_DIR)/processes_test: $(PROCESSES_OBJECT) $(BUILD_DIR)/tests/processes_te
 $(BUILD_DIR)/demand_test: $(DEMAND_OBJECT) $(PROCESSES_OBJECT) $(CLOCK_OBJECT) $(BUILD_DIR)/tests/demand_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
+$(BUILD_DIR)/ipc_test: $(IPC_OBJECT) $(BUILD_DIR)/tests/ipc_test.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 $(BUILD_DIR)/%.o: %.c
 	mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -Isrc $(CFLAGS) $(REQUIRED_CFLAGS) -MMD -MP -c $< -o $@
@@ -53,6 +57,7 @@ test: all
 	./$(BUILD_DIR)/scheduler_test
 	./$(BUILD_DIR)/processes_test $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/demand_test $(abspath $(BUILD_DIR)/controlled_client)
+	./$(BUILD_DIR)/ipc_test
 
 debug:
 	$(MAKE) BUILD_DIR=build/debug CFLAGS='-O0 -g3' test

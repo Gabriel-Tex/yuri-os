@@ -114,3 +114,18 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; código próprio e fixture compi
 `demand_test.c` usa filhos reais e diretório temporário. Verificou que uma segunda criação é recusada enquanto há cliente `STARTING`, inclusive quando o primeiro atrasa a parada; leitura antes da parada e evento de PID alheio são recusados. Após `SIGSTOP` do PID correto, consumiu demandas diferentes em sequência, removeu o arquivo antes da nova criação e recolheu ambos os filhos. Demanda negativa foi recusada sem modificar a saída nem apagar o arquivo; arquivo ausente e saída antes da parada também produziram erro. Um arquivo preexistente foi preservado e impediu a criação. O teste removeu seu próprio diretório e não deixou filhos.
 
 A fixture controlada usa valores conhecidos; ainda não comprova compatibilidade com o cliente oficial. Falhas reais de relógio, `fork`, leitura parcial e remoção do arquivo não foram injetadas. A medição de chegada foi conferida apenas quanto à ordem e ao intervalo monotônico, sem avaliar satisfação ou desempenho do serviço.
+
+## US09 — Semáforos e instâncias
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`; semáforos POSIX nomeados no namespace da máquina.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 30s make test` | Sete testes passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 40s make debug` | Sete testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `timeout 40s bash -c 'for iteration in {1..20}; do ./build/ipc_test >/dev/null || exit 1; done'` | Vinte execuções consecutivas passaram; o watchdog não disparou. |
+| `timeout 40s bash -c 'for iteration in {1..20}; do ./build/demand_test /home/gabriel/S5/SO-yuri/build/controlled_client >/dev/null || exit 1; done'` | Vinte execuções consecutivas da US08 passaram; o watchdog não disparou. |
+
+`ipc_test.c` cria os semáforos inicialmente disponíveis, verifica `sem_trywait` ocupado sem espera, acesso por outro handle e exclusão de uma segunda instância em processo filho. Após o fechamento repetido, os dois nomes estavam ausentes. Com `/sem_block` criado pelo próprio teste antes da inicialização, esta falhou com `EEXIST`, removeu apenas `/sem_atend` criado parcialmente e preservou `/sem_block` até o teste liberá-lo. Uma nova inicialização após a limpeza passou. O filho foi recolhido; o arquivo de lock permanece deliberadamente em `/tmp` com o mesmo inode, sem bloqueio ativo.
+
+O teste não modifica semáforos preexistentes para preparar o ambiente: se houver um deles antes da execução, falha no pré-requisito e exige diagnóstico da origem. Falhas reais de `sem_close`, `sem_unlink` e `flock` não foram injetadas. A integração de `/sem_atend` com o cliente oficial e `/sem_block` com o Analista ainda depende das histórias seguintes; não houve medição de satisfação nem duração do serviço.
