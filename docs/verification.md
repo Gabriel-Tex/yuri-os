@@ -182,3 +182,17 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `service_cli_test.sh` rejeitou falta de argumentos, extras, sinal, zero em X, sufixos e overflow. Uma configuração finita e N = 0 foram reconhecidas a partir de outro diretório por um caminho com espaços. Ambas retornaram código 2 após preparar os recursos, sem alegar atendimento concluído. `service_test.c` preparou um diretório com espaços, confirmou o Analista parado e duas rotinas com contextos distintos, depois recolheu o filho e liberou semáforos, arquivo e diretório próprios. Falha de `exec` e diretório `run` ocupado por arquivo foram recusados sem filhos remanescentes.
 
 A primeira execução de `service_test` revelou estado do Analista não reinicializado após o fechamento; o descritor foi corrigido e a suíte repetida passou. A CLI ainda não gera nem atende clientes: a execução finita e o laço contínuo N = 0 dependem de US14–US18. Portanto não há relatório, taxa ou tempo total do produto nesta verificação. O cliente oficial permanece indisponível.
+
+## US14 — Geração na Recepção
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 80s make test` | Doze testes C e o teste da CLI passaram com `-O2 -g`, sem avisos; o watchdog não disparou. |
+| `timeout 85s make debug` | Os mesmos testes passaram com `-O0 -g3`, sem avisos; o watchdog não disparou. |
+| `timeout 90s bash -c 'for iteration in {1..5}; do ./build/reception_test /home/gabriel/S5/SO-yuri/build/analyst /home/gabriel/S5/SO-yuri/build/controlled_client >/dev/null || exit 1; done'` | Cinco execuções consecutivas passaram; o watchdog não disparou. |
+
+`reception_test.c` usou o cliente controlado e um Atendente de teste que retira e cancela um cliente por vez, sem simular sucesso de atendimento. A Recepção criou exatamente 1 e 125 clientes nos cenários finitos. Em N = 0, continuou até a parada controlada após pelo menos 205 criações. Com a fila cheia, a geração aguardou a liberação de uma vaga; a ocupação nunca ultrapassou 100, incluindo a reserva de `STARTING`. A Recepção registrou criação antes da fila, observou a parada inicial, leu a demanda e enfileirou apenas registros completos; o teste conferiu demanda em microssegundos e paciência de 2,5/5 ms para X = 5. A função de mapeamento da prioridade foi conferida em 256 padrões de bits (128 para cada classe), sem exigir divisão exata numa amostra aleatória.
+
+Uma demanda inválida produziu erro sem inserção na fila. A limpeza cancelou e recolheu o filho parado, liberou a reserva e preservou `demanda.txt` para diagnóstico até o teste removê-lo do diretório próprio. Nenhum filho ou semáforo criado pelo teste permaneceu. O cliente oficial não foi usado; a CLI do produto ainda não liga a Recepção ao Atendente real. Não houve medição de satisfação ou duração do serviço, nem alegação de ganho de desempenho.

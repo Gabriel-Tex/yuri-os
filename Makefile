@@ -17,13 +17,14 @@ IPC_OBJECT = $(BUILD_DIR)/src/platform/ipc.o
 COMPLETION_OBJECT = $(BUILD_DIR)/src/platform/completion_file.o
 ANALYST_COORDINATOR_OBJECT = $(BUILD_DIR)/src/app/analyst_coordinator.o
 SERVICE_OBJECT = $(BUILD_DIR)/src/app/service.o
+WORKERS_OBJECT = $(BUILD_DIR)/src/app/workers.o
 CONTROLLED_CLIENT_OBJECT = $(BUILD_DIR)/tests/fixtures/controlled_client.o
-TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o $(BUILD_DIR)/tests/ipc_test.o $(BUILD_DIR)/tests/completion_file_test.o $(BUILD_DIR)/tests/analyst_test.o $(BUILD_DIR)/tests/analyst_coordinator_test.o $(BUILD_DIR)/tests/service_test.o
-DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(COMPLETION_OBJECT:.o=.d) $(ANALYST_COORDINATOR_OBJECT:.o=.d) $(SERVICE_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d) $(BUILD_DIR)/src/analyst_main.d $(BUILD_DIR)/src/service_main.d
+TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o $(BUILD_DIR)/tests/ipc_test.o $(BUILD_DIR)/tests/completion_file_test.o $(BUILD_DIR)/tests/analyst_test.o $(BUILD_DIR)/tests/analyst_coordinator_test.o $(BUILD_DIR)/tests/service_test.o $(BUILD_DIR)/tests/reception_test.o
+DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(COMPLETION_OBJECT:.o=.d) $(ANALYST_COORDINATOR_OBJECT:.o=.d) $(SERVICE_OBJECT:.o=.d) $(WORKERS_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d) $(BUILD_DIR)/src/analyst_main.d $(BUILD_DIR)/src/service_main.d
 
 .PHONY: all test debug clean
 
-all: $(BUILD_DIR)/domain_test $(BUILD_DIR)/client_queue_test $(BUILD_DIR)/metrics_test $(BUILD_DIR)/scheduler_test $(BUILD_DIR)/controlled_client $(BUILD_DIR)/processes_test $(BUILD_DIR)/demand_test $(BUILD_DIR)/ipc_test $(BUILD_DIR)/completion_file_test $(BUILD_DIR)/analyst $(BUILD_DIR)/analyst_test $(BUILD_DIR)/analyst_coordinator_test $(BUILD_DIR)/service $(BUILD_DIR)/service_test
+all: $(BUILD_DIR)/domain_test $(BUILD_DIR)/client_queue_test $(BUILD_DIR)/metrics_test $(BUILD_DIR)/scheduler_test $(BUILD_DIR)/controlled_client $(BUILD_DIR)/processes_test $(BUILD_DIR)/demand_test $(BUILD_DIR)/ipc_test $(BUILD_DIR)/completion_file_test $(BUILD_DIR)/analyst $(BUILD_DIR)/analyst_test $(BUILD_DIR)/analyst_coordinator_test $(BUILD_DIR)/service $(BUILD_DIR)/service_test $(BUILD_DIR)/reception_test
 
 $(BUILD_DIR)/domain_test: $(CLIENT_OBJECT) $(BUILD_DIR)/tests/domain_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
@@ -69,6 +70,9 @@ $(BUILD_DIR)/service: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/src/service_main.o
 $(BUILD_DIR)/service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/service_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
+$(BUILD_DIR)/reception_test: $(SERVICE_DEPENDENCIES) $(WORKERS_OBJECT) $(CLIENT_OBJECT) $(QUEUE_OBJECT) $(METRICS_OBJECT) $(DEMAND_OBJECT) $(BUILD_DIR)/tests/reception_test.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 $(BUILD_DIR)/%.o: %.c
 	mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -Isrc $(CFLAGS) $(REQUIRED_CFLAGS) -MMD -MP -c $< -o $@
@@ -86,6 +90,7 @@ test: all
 	./$(BUILD_DIR)/analyst_coordinator_test $(abspath $(BUILD_DIR)/analyst)
 	./$(BUILD_DIR)/service_test $(abspath $(BUILD_DIR)/analyst)
 	./tests/service_cli_test.sh $(abspath $(BUILD_DIR)/service)
+	./$(BUILD_DIR)/reception_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 
 debug:
 	$(MAKE) BUILD_DIR=build/debug CFLAGS='-O0 -g3' test

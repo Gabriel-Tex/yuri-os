@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US12 estão concluídas; a preparação da US13 está implementada e sua execução completa depende das histórias seguintes; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US12 estão concluídas; a preparação da US13 e a Recepção da US14 estão implementadas isoladamente, enquanto a execução completa depende das histórias seguintes; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
 
 ## Como usar o backlog
 
@@ -292,7 +292,7 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Tipo:** funcional · **Depende de:** US03, US06, US09 · **Cobre:** R01–R03; D01, D09, D13.
 
-**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI aceita a configuração, inicia e libera recursos, mas termina com código 2 antes do atendimento para não apresentar um finito incompleto como sucesso. O laço N = 0, a geração e o atendimento ainda dependem das histórias seguintes; estes critérios impedem declarar a execução integrada concluída.
+**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI aceita a configuração, inicia e libera recursos, mas termina com código 2 antes do atendimento para não apresentar um finito incompleto como sucesso. A geração e o laço N = 0 foram verificados em US14 com Atendente controlado; a ligação à CLI, o atendimento e o comando `s` ainda impedem declarar a execução integrada concluída.
 
 **História:** como executor, quero informar N e X e receber erro claro quando a configuração for inválida.
 
@@ -313,6 +313,8 @@ Resultado: executar o modo finito do início ao relatório.
 ### US14 — Gerar clientes na Recepção
 
 **Tipo:** funcional · **Depende de:** US02, US06, US08, US13 · **Cobre:** R02–R05, R13–R15.
+
+**Estado:** Recepção implementada e verificada isoladamente em 2026-11-08. `app/workers` cria N = 1 e N = 125, continua em N = 0 até uma parada controlada, respeita 100 vagas, sorteia prioridades e só enfileira após ler a demanda. O teste e as limitações estão em [verification.md](verification.md#us14--geração-na-recepção). A CLI ainda usa rotinas de preparação; o atendimento real e o comando `s` pertencem às histórias seguintes.
 
 **História:** como executor, quero gerar a quantidade informada de clientes, com prioridades sorteadas e limite de espera respeitado.
 
@@ -442,7 +444,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01–US13. Há compilação dos testes de domínio, conversão, runtime, processos, demanda, IPC, arquivo de PIDs, Analista e coordenação, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Cliente oficial, atendimento integrado, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** iniciada como suporte às US01–US14. Há compilação dos testes de domínio, conversão, runtime, processos, demanda, IPC, arquivo de PIDs, Analista, coordenação, preparação e Recepção, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Cliente oficial, atendimento integrado, documentação de uso integrado e verificações correspondentes continuam pendentes.
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

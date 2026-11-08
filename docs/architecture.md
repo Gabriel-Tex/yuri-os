@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11), coordenação dos lotes (US12) e preparação do serviço (US13) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11), coordenação dos lotes (US12), preparação do serviço (US13) e Recepção (US14) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -106,6 +106,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── analyst_coordinator_test.c
 │   ├── service_test.c
 │   ├── service_cli_test.sh
+│   ├── reception_test.c
 │   ├── integration_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
@@ -133,7 +134,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/domain/metrics.h` / `.c` | Expor e implementar contadores, satisfação e taxa com instantes fornecidos pela aplicação. |
 | `src/app/service.h` / `.c` | Definir configuração/resultado e coordenar eventos, recursos, estado da execução e finalização. |
 | `src/app/analyst_coordinator.h` / `.c` | Associar eventos do Analista a despertares, inclusão de PIDs e drenagem. |
-| `src/app/workers.h` / `.c` | Expor e implementar as rotinas Recepção e Atendente e seus pontos de espera. |
+| `src/app/workers.h` / `.c` | Implementar a Recepção e seus eventos; o Atendente real permanece na US15. |
 | `src/runtime/scheduler.h` / `.c` | Expor e implementar criação, despacho, cessão, espera, despertar e destruição dos contextos. |
 | `src/platform/processes.h` / `.c` | Definir eventos e encapsular criação, sinais, `waitpid`, máscaras e `pselect`. |
 | `src/platform/demand.h` / `.c` | Abrir o diretório da execução e manter uma única inicialização até a demanda ser validada e consumida. |
@@ -150,6 +151,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
 | `tests/analyst_coordinator_test.c` | Cobrir política de despertar e drenagem com Analista e runtime reais. |
 | `tests/service_test.c` / `service_cli_test.sh` | Cobrir preparação, limpeza e validação da entrada com caminhos reais. |
+| `tests/reception_test.c` | Cobrir geração finita, contínua, fila cheia e demanda inválida com filhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
@@ -235,7 +237,7 @@ Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` 
 
 Na US09, `ipc_service_init` mantém um lock com `flock` em `/tmp/service-simulator-<uid>.lock` durante a execução. O inode permanece após o fechamento para impedir que duas instâncias bloqueiem arquivos diferentes. O serviço cria `/sem_atend` e `/sem_block` com `O_CREAT | O_EXCL`, valor inicial 1 e posse registrada; recurso já existente causa erro sem remoção. `ipc_service_close` fecha handles, remove apenas os nomes criados por esta instância e aceita repetição ou falha parcial. A tentativa `ipc_try_acquire` devolve ocupado sem bloquear em `EAGAIN`; o serviço coordena a espera por evento fora do adaptador. Clientes e Analista podem abrir os nomes existentes sem adquirir sua propriedade. O teste isolado cobre exclusão e limpeza; a integração com o atendimento pertence às histórias posteriores.
 
-Na US13, `service_main` aceita apenas dígitos decimais para N e X, rejeita sinais, sufixos e overflow, e limita X ao maior valor conversível para nanossegundos. O caminho absoluto do executável identifica o projeto e o `analyst` irmão, independentemente do diretório corrente ou de espaços no caminho. `service_prepare` inicia o relógio, adquire IPC, cria `run/execution-XXXXXX`, abre `completed.log`, prepara o escalonador, cria o Analista e confirma sua parada inicial. `service_process_events` é o único consumidor de `waitpid` e pode encaminhar eventos de cliente a um callback da aplicação. A CLI inicia duas rotinas distintas para verificar o runtime e libera os recursos em ordem controlada. Até a integração do atendimento, uma entrada válida termina com código 2 e diagnóstico explícito, sem relatório de sucesso ou taxa; N = 0 já é representado na configuração, mas o laço contínuo pertence à US14 e a parada por `s` à US17–US18.
+Na US13, `service_main` aceita apenas dígitos decimais para N e X, rejeita sinais, sufixos e overflow, e limita X ao maior valor conversível para nanossegundos. O caminho absoluto do executável identifica o projeto e o `analyst` irmão, independentemente do diretório corrente ou de espaços no caminho. `service_prepare` inicia o relógio, adquire IPC, cria `run/execution-XXXXXX`, abre `completed.log`, prepara o escalonador, cria o Analista e confirma sua parada inicial. `service_process_events` é o único consumidor de `waitpid` e pode encaminhar eventos de cliente a um callback da aplicação. A CLI inicia duas rotinas distintas para verificar o runtime e libera os recursos em ordem controlada. Até a integração do atendimento, uma entrada válida termina com código 2 e diagnóstico explícito, sem relatório de sucesso ou taxa; N = 0 é representado na configuração e seu laço foi verificado na US14; a ligação à CLI e a parada por `s` permanecem para US15–US18.
 
 ### Inicialização
 
@@ -256,6 +258,8 @@ O Analista é filho direto do Atendimento. O PID retornado por `fork` é a ident
 5. Inserir o cliente `QUEUED`, avisar o Atendente e ceder. Criar o próximo somente após consumir a demanda anterior.
 
 A reserva impede ultrapassar 100 clientes à espera mesmo com um `STARTING`. Um cliente `IN_SERVICE` não ocupa vaga. A medição desde a chegada inclui sua inicialização, e não começa apenas ao entrar na fila.
+
+Na US14, `workers_reception_init` semeia uma única fonte pseudoaleatória a partir de `getrandom`; cada saída escolhe prioridade pelo bit mais significativo, com mapeamento 1:1 entre classes, sem impor metade exata. A Recepção reserva uma vaga antes do `fork`, registra a chegada pelo adaptador de demanda, contabiliza a criação e espera pelo `SIGSTOP` do PID correto via evento do runtime. Só então consome a demanda e transfere o registro completo à fila. Com 100 esperas, `scheduler_wait` suspende apenas a Recepção até a retirada notificar vaga; um Atendente pode continuar executável. No modo finito, o laço termina após N criações, inclusive N maior que 100; com N = 0, só uma solicitação externa de parada interrompe novas criações. Uma criação já iniciada é finalizada antes de sair desse laço; o cancelamento de `STARTING` na parada do produto pertence à US18. Erros mantêm registros incompletos fora da fila, e a limpeza da Recepção recolhe os filhos ainda sob sua responsabilidade fora das threads de usuário.
 
 ### Atendente
 
