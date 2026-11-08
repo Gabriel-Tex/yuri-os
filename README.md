@@ -2,7 +2,7 @@
 
 Este repositório contém o início da implementação da primeira parte do trabalho prático: um atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário. O cliente fornecido pelo professor e o processo Analista compõem o fluxo planejado. A implementação usa C17 para Linux/glibc.
 
-US01–US12 estão implementadas; a preparação da US13 e a Recepção da US14 também estão disponíveis: registro e transições de estado, fila limitada, métricas com tempos fornecidos pelo chamador, escalonador cooperativo, adaptador de processos, leitura serializada da demanda, IPC, arquivo de PIDs, processo Analista e coordenação da drenagem. A fila reserva uma vaga para o cliente em inicialização e escolhe o próximo pelo menor prazo absoluto. As métricas usam a resposta desde a chegada, incluindo espera e serviço. O runtime alterna contextos próprios e oferece espera por condição; os adaptadores de plataforma criam filhos reais, recolhem estados sem bloquear e consomem `demanda.txt` após a parada do PID esperado. O atendimento completo e a conferência do cliente oficial continuam pendentes; `service N X` já valida e prepara a execução.
+US01–US15 estão implementadas como módulos: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção e Atendente. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A execução finita integrada e a conferência do cliente oficial continuam pendentes; `service N X` ainda valida e prepara a execução.
 
 Para compilar e verificar o domínio, instale um compilador C17 e GNU Make:
 

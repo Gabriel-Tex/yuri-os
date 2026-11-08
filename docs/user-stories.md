@@ -352,6 +352,8 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Verificação:** usar fila de fixture independentemente de US14; cliente atrasado antes de adquirir semáforo, prazo vencido, saída por sinal e Analista ativo durante conclusão.
 
+**Estado:** implementação do Atendente concluída em 2026-11-08. A rotina própria do escalonador espera eventos do PID atendido, contabiliza somente saída normal com status zero e mantém uma conclusão enquanto o Analista está ativo. O teste isolado e as limitações estão em [verification.md](verification.md#us15--atendimento-confirmado). A ligação da Recepção ao relatório finito pertence à US16.
+
 ### US16 — Fechar execução finita e emitir o relatório
 
 **Tipo:** funcional · **Depende de:** US14, US15 · **Cobre:** R03, R06–R07, R09, R11, R18.

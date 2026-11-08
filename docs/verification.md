@@ -196,3 +196,14 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall -Wextra -Wpedanti
 `reception_test.c` usou o cliente controlado e um Atendente de teste que retira e cancela um cliente por vez, sem simular sucesso de atendimento. A Recepção criou exatamente 1 e 125 clientes nos cenários finitos. Em N = 0, continuou até a parada controlada após pelo menos 205 criações. Com a fila cheia, a geração aguardou a liberação de uma vaga; a ocupação nunca ultrapassou 100, incluindo a reserva de `STARTING`. A Recepção registrou criação antes da fila, observou a parada inicial, leu a demanda e enfileirou apenas registros completos; o teste conferiu demanda em microssegundos e paciência de 2,5/5 ms para X = 5. A função de mapeamento da prioridade foi conferida em 256 padrões de bits (128 para cada classe), sem exigir divisão exata numa amostra aleatória.
 
 Uma demanda inválida produziu erro sem inserção na fila. A limpeza cancelou e recolheu o filho parado, liberou a reserva e preservou `demanda.txt` para diagnóstico até o teste removê-lo do diretório próprio. Nenhum filho ou semáforo criado pelo teste permaneceu. O cliente oficial não foi usado; a CLI do produto ainda não liga a Recepção ao Atendente real. Não houve medição de satisfação ou duração do serviço, nem alegação de ganho de desempenho.
+
+## US15 — Atendimento confirmado
+
+Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall`, `-Wextra` e `-Wpedantic`.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 90s make test` | Treze testes C e teste da CLI passaram com `-O2 -g`, sem avisos; watchdog não disparou. |
+| `timeout 100s make debug` | Os mesmos testes passaram com `-O0 -g3`, sem avisos; watchdog não disparou. |
+
+`attendant_test.c` inseriu um cliente já parado diretamente na fila, com prazo vencido. A fixture atrasou 30 ms antes de adquirir `/sem_atend` e saiu normalmente após o serviço; o Atendente esperou a saída, registrou um concluído e zero satisfeitos, o Analista imprimiu o PID e a drenagem confirmou arquivo vazio. Outra fixture terminou por sinal após `SIGCONT`; não houve conclusão nem PID registrado, e a limpeza marcou uma falha e recolheu o filho. O teste também verificou ausência de filhos remanescentes. O estado ativo do Analista e a preservação de PIDs durante seu lote foram exercitados no teste real da US12; a integração com geração simultânea e relatório é verificada na US16. O cliente oficial permanece indisponível.

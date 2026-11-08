@@ -134,7 +134,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/domain/metrics.h` / `.c` | Expor e implementar contadores, satisfação e taxa com instantes fornecidos pela aplicação. |
 | `src/app/service.h` / `.c` | Definir configuração/resultado e coordenar eventos, recursos, estado da execução e finalização. |
 | `src/app/analyst_coordinator.h` / `.c` | Associar eventos do Analista a despertares, inclusão de PIDs e drenagem. |
-| `src/app/workers.h` / `.c` | Implementar a Recepção e seus eventos; o Atendente real permanece na US15. |
+| `src/app/workers.h` / `.c` | Implementar Recepção e Atendente, com transferência de registros e eventos de processos. |
 | `src/runtime/scheduler.h` / `.c` | Expor e implementar criação, despacho, cessão, espera, despertar e destruição dos contextos. |
 | `src/platform/processes.h` / `.c` | Definir eventos e encapsular criação, sinais, `waitpid`, máscaras e `pselect`. |
 | `src/platform/demand.h` / `.c` | Abrir o diretório da execução e manter uma única inicialização até a demanda ser validada e consumida. |
@@ -269,6 +269,8 @@ Na US14, `workers_reception_init` semeia uma única fonte pseudoaleatória a par
 4. Atualizar satisfação e contadores uma vez; acrescentar o PID a `completed.log` e solicitar o despertar do Analista quando cabível.
 
 Há um único cliente em atendimento. `/sem_atend` existe para o protocolo do cliente, mas sua disponibilidade não comprova término: após `SIGCONT`, o filho pode ainda não tê-lo adquirido. A confirmação vem do estado recolhido do processo.
+
+Na US15, `workers_attendant_run` retira o menor prazo da fila, notifica a vaga e espera o evento terminal do PID retomado. O callback registra o instante monotônico relativo ao início da execução assim que recolhe a saída normal com status zero; saída por sinal ou status não zero encerra o fluxo com erro. A rotina atualiza métricas uma vez e conserva o PID até que o coordenador permita anexá-lo ao arquivo. Se o Analista estiver ativo, espera sua parada pelo evento do escalonador antes de iniciar outro atendimento. A limpeza de um atendimento incompleto ocorre fora do contexto de usuário e recolhe o filho.
 
 ### Analista e arquivo
 

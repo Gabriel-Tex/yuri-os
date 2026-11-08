@@ -266,3 +266,160 @@ bool workers_reception_close(struct workers_reception *reception)
     }
     return demand_close(&reception->demand);
 }
+
+bool workers_attendant_init(struct workers_attendant *attendant,
+                            struct service_state *service,
+                            struct client_queue *queue, struct metrics *metrics,
+                            bool *generation_finished)
+{
+    if (attendant == NULL || service == NULL || !service->initialized ||
+        queue == NULL || metrics == NULL || generation_finished == NULL) {
+        errno = EINVAL;
+        return false;
+    }
+    *attendant = (struct workers_attendant){.service = service, .queue = queue,
+        .metrics = metrics, .generation_finished = generation_finished};
+    return true;
+}
+
+static void workers_attendant_fail(struct workers_attendant *attendant,
+                                    int error)
+{
+    attendant->error = error != 0 ? error : EIO;
+    attendant->service->event_error = attendant->error;
+    scheduler_notify(&attendant->service->scheduler, WORKERS_TERMINAL_EVENT);
+}
+
+static bool workers_attendant_has_work(void *context)
+{
+    const struct workers_attendant *attendant = context;
+    return attendant->queue->count > 0 || *attendant->generation_finished ||
+           attendant->error != 0;
+}
+
+static bool workers_attendant_terminal(void *context)
+{
+    const struct workers_attendant *attendant = context;
+    return attendant->active_reaped || attendant->error != 0;
+}
+
+void workers_attendant_on_event(void *context,
+                                const struct processes_event *event)
+{
+    struct workers_attendant *attendant = context;
+    if (!attendant->active_valid || event->pid != attendant->active.pid) {
+        workers_attendant_fail(attendant, EPROTO);
+        return;
+    }
+    if (event->kind == PROCESSES_CONTINUED) return;
+    if (event->kind == PROCESSES_STOPPED) {
+        workers_attendant_fail(attendant, EPROTO);
+        return;
+    }
+    attendant->active_reaped = true;
+    if (event->kind != PROCESSES_EXITED_OK) {
+        workers_attendant_fail(attendant, ECHILD);
+        return;
+    }
+    uint64_t observed_ns;
+    if (!clock_monotonic_ns(&observed_ns) ||
+        !clock_elapsed_ns(attendant->service->start_ns, observed_ns,
+                          &attendant->completion_ns)) {
+        workers_attendant_fail(attendant, errno);
+        return;
+    }
+    attendant->completed_ok = true;
+    scheduler_notify(&attendant->service->scheduler, WORKERS_TERMINAL_EVENT);
+}
+
+void workers_attendant_run(void *argument)
+{
+    struct workers_attendant *attendant = argument;
+    while (attendant->error == 0) {
+        if (attendant->queue->count == 0) {
+            if (*attendant->generation_finished) break;
+            if (!scheduler_wait(&attendant->service->scheduler,
+                                WORKERS_CLIENT_EVENT,
+                                workers_attendant_has_work, attendant)) {
+                workers_attendant_fail(attendant, errno);
+            }
+            continue;
+        }
+        if (!client_queue_take_next(attendant->queue, &attendant->active)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
+        attendant->active_valid = true;
+        attendant->active_reaped = false;
+        attendant->completed_ok = false;
+        scheduler_notify(&attendant->service->scheduler, WORKERS_SPACE_EVENT);
+        if (!client_start(&attendant->active) ||
+            !processes_send(attendant->active.pid, SIGCONT) ||
+            !scheduler_wait(&attendant->service->scheduler,
+                            WORKERS_TERMINAL_EVENT,
+                            workers_attendant_terminal, attendant)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
+        if (attendant->error != 0 || !attendant->completed_ok) break;
+        if (!metrics_record_completed(attendant->metrics, &attendant->active,
+                                      attendant->completion_ns)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
+        bool appended = false;
+        while (!appended && attendant->error == 0) {
+            if (!analyst_coordinator_try_append(&attendant->service->coordinator,
+                                                 attendant->active.pid,
+                                                 &appended)) {
+                workers_attendant_fail(attendant, errno);
+                break;
+            }
+            if (!appended &&
+                !scheduler_wait(&attendant->service->scheduler,
+                                ANALYST_COORDINATOR_EVENT,
+                                analyst_coordinator_can_append,
+                                &attendant->service->coordinator)) {
+                workers_attendant_fail(attendant, errno);
+            }
+        }
+        if (attendant->error != 0) break;
+        attendant->active_valid = false;
+        bool woken;
+        if (!analyst_coordinator_maybe_wake(&attendant->service->coordinator,
+                                            attendant->queue->count == 0,
+                                            &woken)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
+    }
+    attendant->finished = attendant->error == 0;
+}
+
+bool workers_attendant_close(struct workers_attendant *attendant)
+{
+    if (attendant == NULL) {
+        errno = EINVAL;
+        return false;
+    }
+    if (attendant->active_valid && !attendant->active_reaped) {
+        struct workers_cleanup_state cleanup = {.service = attendant->service,
+            .pids = {attendant->active.pid}, .count = 1, .remaining = 1};
+        if (!processes_send(attendant->active.pid, SIGKILL) && errno != ESRCH)
+            return false;
+        while (cleanup.remaining > 0) {
+            if (!processes_collect(&attendant->service->watcher,
+                                   workers_cleanup_event, &cleanup, NULL) ||
+                (cleanup.remaining > 0 &&
+                 !processes_wait(&attendant->service->watcher))) return false;
+        }
+        attendant->active_reaped = true;
+    }
+    if (attendant->active_valid &&
+        attendant->active.state == CLIENT_IN_SERVICE &&
+        !metrics_record_failed(attendant->metrics, &attendant->active)) {
+        return false;
+    }
+    attendant->active_valid = false;
+    return true;
+}

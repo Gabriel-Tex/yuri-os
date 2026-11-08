@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -23,6 +24,38 @@ static int check_descriptor(const char *number)
 
 int main(int argc, char **argv)
 {
+    if (argc == 1 || (argc == 2 &&
+        (strcmp(argv[1], "service_late") == 0 ||
+         strcmp(argv[1], "service_signal") == 0)))
+    {
+        FILE *file = fopen("demanda.txt", "w");
+        if (file == NULL) return 20;
+        int written = fputs("1000\n", file);
+        int closed = fclose(file);
+        if (written == EOF || closed == EOF) return 20;
+        if (raise(SIGSTOP) != 0) return 21;
+        if (argc == 2 && strcmp(argv[1], "service_signal") == 0)
+        {
+            raise(SIGTERM);
+            return 22;
+        }
+        if (argc == 2)
+        {
+            struct timespec pause = {.tv_sec = 0, .tv_nsec = 30000000};
+            while (nanosleep(&pause, &pause) == -1 && errno == EINTR) {}
+        }
+        sem_t *semaphore = sem_open("/sem_atend", 0);
+        if (semaphore == SEM_FAILED) return 23;
+        int acquired;
+        do { acquired = sem_wait(semaphore); }
+        while (acquired == -1 && errno == EINTR);
+        if (acquired == -1) { sem_close(semaphore); return 24; }
+        struct timespec service = {.tv_sec = 0, .tv_nsec = 1000000};
+        while (nanosleep(&service, &service) == -1 && errno == EINTR) {}
+        int released = sem_post(semaphore);
+        int closed_semaphore = sem_close(semaphore);
+        return released == 0 && closed_semaphore == 0 ? 0 : 25;
+    }
     if (argc < 2)
     {
         return 12;

@@ -38,6 +38,20 @@ struct workers_reception {
     int error;
 };
 
+struct workers_attendant {
+    struct service_state *service;
+    struct client_queue *queue;
+    struct metrics *metrics;
+    bool *generation_finished;
+    struct client_record active;
+    uint64_t completion_ns;
+    bool active_valid;
+    bool active_reaped;
+    bool completed_ok;
+    bool finished;
+    int error;
+};
+
 /* A fonte de sorteio é iniciada uma vez. Cada bit tem mapeamento 1:1. */
 enum client_priority workers_priority_from_bits(uint64_t bits);
 bool workers_reception_init(struct workers_reception *reception,
@@ -49,5 +63,14 @@ void workers_reception_run(void *argument);
 void workers_reception_on_event(void *context,
                                 const struct processes_event *event);
 bool workers_reception_close(struct workers_reception *reception);
+
+bool workers_attendant_init(struct workers_attendant *attendant,
+                            struct service_state *service,
+                            struct client_queue *queue, struct metrics *metrics,
+                            bool *generation_finished);
+void workers_attendant_run(void *argument);
+void workers_attendant_on_event(void *context,
+                                const struct processes_event *event);
+bool workers_attendant_close(struct workers_attendant *attendant);
 
 #endif
