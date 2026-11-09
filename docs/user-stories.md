@@ -454,7 +454,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Tipo:** técnico · **Depende de:** nada para começar; completar conforme os módulos surgirem · **Cobre:** R01–R02, R17; D01.
 
-**Estado:** iniciada como suporte às US01–US14. Há compilação dos testes de domínio, conversão, runtime, processos, demanda, IPC, arquivo de PIDs, Analista, coordenação, preparação e Recepção, além da fixture controlada; alvos `test`, `debug` e `clean`, dependências de cabeçalhos, `.gitignore` e registro de verificação. Cliente oficial, atendimento integrado, documentação de uso integrado e verificações correspondentes continuam pendentes.
+**Estado:** concluída em 2026-11-09. O build compila os três executáveis quando a fonte fornecida está presente e a suíte controlada pode ser executada sem ela. Os comandos de instalação, execução e limpeza estão no README. A conferência da fonte pertence à US21. [Registro de verificação](verification.md#us20--construção-e-execução).
 
 **Entrega:** `Makefile`, `.gitignore`, README atualizado e registro de verificações reais.
 

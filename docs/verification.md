@@ -231,3 +231,9 @@ Em 2026-11-09, `timeout 120s make test` passou com C17, `-Wall -Wextra -Wpedanti
 ## US19 — Erros e limpeza controlada
 
 Em 2026-11-09, `timeout 120s make test` e `timeout 120s make debug` passaram sem avisos de compilação. `infinite_service_test.c` enviou `SIGINT` e `SIGTERM` ao processo de serviço durante carga, confirmou resultado incompleto, fechamento, ausência de filhos e semáforos e restauração dos handlers e da máscara. `finite_service_test.c` exercitou `exec` inválido, demanda ausente, término anormal do cliente e morte do Analista; após cada erro, verificou que não havia filhos ou semáforos. `error_service_test.sh` conferiu status não zero e diagnóstico da CLI para demanda ausente, cliente anormal e saída do Analista em `/dev/full`, sem taxa de sucesso. O watchdog externo não disparou. Falha real de `fork` e falhas de cada chamada de liberação não foram injetadas; os adaptadores verificam seus retornos, mas não há comprovação empírica desses caminhos. A fonte oficial do cliente segue indisponível.
+
+## US20 — Construção e execução
+
+Em 2026-11-09, em uma cópia isolada das fontes, `make clean` seguido de `timeout 120s make -j4 test` compilou o código próprio em C17 com `-Wall -Wextra -Wpedantic` e passou sem avisos. `make -n -W src/domain/client.h build/service` indicou recompilação de `client.c` e `service.c`. `ldd` em `build/service` e `build/analyst` listou a libc e os componentes do carregador Linux.
+
+`make client` retornou erro com indicação de `provided/client.c` quando a fonte estava ausente. Na mesma cópia, `make clean` removeu `build/` e preservou o marcador `run/keep` e `src/service_main.c`. Depois, `make client` compilou a listagem extraída da página 3 do PDF, sem editar o código. A verificação do protocolo e da execução com essa fonte pertence à US21.

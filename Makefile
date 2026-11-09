@@ -3,8 +3,10 @@ CPPFLAGS ?=
 CFLAGS ?= -O2 -g
 LDFLAGS ?=
 LDLIBS ?=
+CLIENT_CFLAGS ?= -O2 -g -std=c17
 
 REQUIRED_CFLAGS = -std=c17 -Wall -Wextra -Wpedantic
+CLIENT_SOURCE = provided/client.c
 BUILD_DIR = build
 CLIENT_OBJECT = $(BUILD_DIR)/src/domain/client.o
 QUEUE_OBJECT = $(BUILD_DIR)/src/domain/client_queue.o
@@ -24,9 +26,26 @@ CONTROLLED_CLIENT_OBJECT = $(BUILD_DIR)/tests/fixtures/controlled_client.o
 TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o $(BUILD_DIR)/tests/ipc_test.o $(BUILD_DIR)/tests/completion_file_test.o $(BUILD_DIR)/tests/analyst_test.o $(BUILD_DIR)/tests/analyst_coordinator_test.o $(BUILD_DIR)/tests/service_test.o $(BUILD_DIR)/tests/reception_test.o $(BUILD_DIR)/tests/attendant_test.o $(BUILD_DIR)/tests/finite_service_test.o
 DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(INTERRUPT_OBJECT:.o=.d) $(COMPLETION_OBJECT:.o=.d) $(TERMINAL_OBJECT:.o=.d) $(ANALYST_COORDINATOR_OBJECT:.o=.d) $(SERVICE_OBJECT:.o=.d) $(WORKERS_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d) $(BUILD_DIR)/tests/terminal_test.d $(BUILD_DIR)/tests/infinite_service_test.d $(BUILD_DIR)/src/analyst_main.d $(BUILD_DIR)/src/service_main.d
 
-.PHONY: all test debug clean
+.PHONY: all client test debug clean
 
 all: $(BUILD_DIR)/domain_test $(BUILD_DIR)/client_queue_test $(BUILD_DIR)/metrics_test $(BUILD_DIR)/scheduler_test $(BUILD_DIR)/controlled_client $(BUILD_DIR)/processes_test $(BUILD_DIR)/demand_test $(BUILD_DIR)/ipc_test $(BUILD_DIR)/completion_file_test $(BUILD_DIR)/terminal_test $(BUILD_DIR)/analyst $(BUILD_DIR)/analyst_test $(BUILD_DIR)/analyst_coordinator_test $(BUILD_DIR)/service $(BUILD_DIR)/service_test $(BUILD_DIR)/reception_test $(BUILD_DIR)/attendant_test $(BUILD_DIR)/finite_service_test $(BUILD_DIR)/infinite_service_test
+
+ifneq ($(wildcard $(CLIENT_SOURCE)),)
+all: client
+client: $(BUILD_DIR)/client
+
+$(BUILD_DIR)/client: $(BUILD_DIR)/provided/client.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+# A glibc expõe usleep com _DEFAULT_SOURCE no modo C17.
+$(BUILD_DIR)/provided/client.o: $(CLIENT_SOURCE)
+	mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -D_DEFAULT_SOURCE $(CLIENT_CFLAGS) -MMD -MP -c $< -o $@
+else
+client:
+	@echo 'Instale a fonte entregue pelo professor em provided/client.c.' >&2
+	@exit 1
+endif
 
 $(BUILD_DIR)/terminal_test: $(TERMINAL_OBJECT) $(BUILD_DIR)/tests/terminal_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
@@ -119,4 +138,4 @@ debug:
 clean:
 	$(RM) -r -- build
 
--include $(DEPENDENCIES)
+-include $(DEPENDENCIES) $(BUILD_DIR)/provided/client.d

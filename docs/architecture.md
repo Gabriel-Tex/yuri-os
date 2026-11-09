@@ -362,6 +362,8 @@ No fechamento controlado, a drenagem confirma `completed.log` vazio antes de rec
 
 ## Verificação e desenvolvimento
 
+O Makefile registra dependências de cabeçalhos junto aos objetos com `-MMD -MP`. `make` inclui `build/client` quando encontra `provided/client.c`. `make client` exige essa fonte e fornece diagnóstico quando ela está ausente. O cliente tem opções de compilação separadas e usa `_DEFAULT_SOURCE` para a declaração de `usleep` na glibc. `make test` executa a suíte com a fixture controlada. `make debug` usa objetos próprios em `build/debug/`, e `make clean` remove `build/` sem tocar em `run/`.
+
 Desenvolver domínio, runtime, processos/IPC e Analista com testes isolados; depois integrar atendimento, encerramento e avaliação. A [matriz de histórias](user-stories.md#matriz-de-rastreabilidade) relaciona cada requisito a testes e cenários de aceite.
 
 Cobrir N = 1, N > 100 e N = 0; X ímpar; igualdade e ultrapassagem da paciência; fila cheia; demanda serializada; lotes de 1, 10, 11 e 27; s nos diferentes estados; falhas parciais; restauração do terminal e recolhimento de filhos. Compilar código próprio com avisos fortes. Ferramentas de memória podem ter limitações com `ucontext`; ThreadSanitizer isoladamente não demonstra a correção do escalonador.
