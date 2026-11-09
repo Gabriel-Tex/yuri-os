@@ -292,6 +292,8 @@ Na US12, o serviço fornece PID do filho, `completion_file` e `scheduler` ao `an
 
 ### Encerramento
 
+Na US17, `platform/terminal` salva flags e atributos de `stdin`, desativa modo canônico e eco apenas em TTY e ativa `O_NONBLOCK`. `terminal_poll` consome os bytes disponíveis, reconhece `s` e mantém EOF como condição persistente. `terminal_close` restaura ambos os estados, inclusive após inicialização parcial; a aplicação liga a condição ao serviço na US18.
+
 Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINISHED`; falhas entram no caminho de limpeza com status de erro.
 
 - **N > 0:** parar a geração após N, concluir todos, drenar também o último lote parcial e então encerrar o Analista.

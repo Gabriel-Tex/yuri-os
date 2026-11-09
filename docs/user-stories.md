@@ -384,6 +384,8 @@ Resultado: parar o serviço sem perder registros concluídos nem deixar recursos
 
 **Tipo:** funcional · **Depende de:** nada · **Cobre:** R08; D08.
 
+**Estado:** adaptador concluído em 2026-11-09. A leitura e restauração foram verificadas em pipe e pseudoterminal; a ligação à execução infinita pertence à US18. Registro em [verification.md](verification.md#us17--entrada-e-restauração-do-terminal).
+
 **História:** como executor do modo infinito, quero interromper a geração com s sem precisar pressionar Enter e recuperar o terminal ao sair.
 
 **Aceite:**

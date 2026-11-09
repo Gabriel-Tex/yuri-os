@@ -1,5 +1,7 @@
 # yuri-os
 
+O adaptador de entrada da US17 reconhece `s` em TTY sem Enter ou em pipe e restaura o estado original na saída controlada. Sua ligação ao modo infinito pertence à US18.
+
 Este repositório implementa o fluxo finito da primeira parte do trabalho prático: atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário e um processo Analista. A implementação usa C17 para Linux/glibc.
 
 US01–US16 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente e relatório finito. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21. O modo infinito com comando `s` permanece nas US17–US18.
