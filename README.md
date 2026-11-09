@@ -11,18 +11,20 @@ O Atendente confirma o término normal de cada cliente antes de contabilizá-lo 
 Para compilar em Linux com glibc, instale um compilador C17 e GNU Make. Os testes também usam Bash e `timeout` do GNU Coreutils.
 
 ```sh
-make          # Compila service, analyst, os testes e o cliente se a fonte estiver disponível.
-make client   # Compila build/client a partir de provided/client.c.
-make test     # Executa os testes C e da CLI, inclusive filhos reais e semáforos.
+make             # Compila service, analyst, os testes e o cliente fornecido.
+make client      # Compila build/client a partir de provided/client.c.
+make test        # Executa os testes C e da CLI, inclusive filhos reais e semáforos.
 make test-client # Verifica os dois modos usando o cliente do enunciado.
-make debug    # Compila e testa com -O0 -g3 em build/debug/.
-make clean    # Remove somente build/; preserva fontes e run/.
+make debug       # Compila e testa com -O0 -g3 em build/debug/.
+make clean       # Remove build/ e preserva fontes e run/.
 ```
 
 Execute `make` e depois `build/service N X`. Use N inteiro não negativo e X inteiro positivo em milissegundos. Por exemplo, `build/service 125 5` atende 125 clientes e `build/service 0 5` aguarda `s`. Se o professor distribuir uma revisão, preserve o conteúdo original em `provided/client.c` e registre a nova origem e versão em `provided/README.md`.
 `CC`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS` e `LDLIBS` podem ser fornecidos ao Make. O código próprio compila com C17 e `-Wall -Wextra -Wpedantic`. `CLIENT_CFLAGS` configura as opções da fonte fornecida separadamente. Objetos, dependências de cabeçalhos e binários ficam em `build/`, ignorado pelo Git junto a `run/`. Sem a fonte avulsa, `make test` usa `build/controlled_client` por meio de `SERVICE_CLIENT_PATH`.
 
 O relatório aparece depois dos PIDs e da limpeza, com criados, concluídos, satisfeitos, insatisfeitos, taxa e tempo total em milissegundos. No modo finito, a taxa é satisfeitos/N. No infinito, é satisfeitos/concluídos.
+
+Depois de `make`, `bash tests/benchmark.sh official 125 5 5` mede cinco execuções finitas com N = 125 e X = 5 ms e escreve CSV em `stdout`. Use `controlled` para a carga da fixture. Cada linha conserva os contadores e o tempo do relatório, e uma falha interrompe a série. O registro de verificação descreve as condições e os resultados das duas cargas.
 
 - [Arquitetura](docs/architecture.md): requisitos, decisões técnicas, módulos, fluxos e tratamento de recursos.
 - [Histórias de usuário](docs/user-stories.md): ordem de desenvolvimento, critérios de aceitação e rastreabilidade.

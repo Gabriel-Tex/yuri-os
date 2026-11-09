@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US21 estão verificadas, inclusive a integração com a listagem de `cliente.c` confirmada para a entrega. A avaliação pertence à US22.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US22 estão verificadas com os cenários e as limitações registrados em [verification.md](verification.md).
 
 ## Como usar o backlog
 
@@ -497,6 +497,8 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 ### US22 — Medir desempenho e fechar a rastreabilidade
 
 **Tipo:** funcional · **Depende de:** US21 · **Cobre:** R04, R06–R08, R18; avaliação competitiva.
+
+**Estado:** concluída em 2026-11-09. A suíte funcional foi repetida e cada requisito tem evidência registrada. Vinte medições finitas foram feitas em séries separadas para a fixture e o cliente do enunciado. [Registro de verificação](verification.md#us22--avaliação-e-rastreabilidade).
 
 **História:** como apresentador, quero mostrar correção, satisfação e duração em condições conhecidas para explicar os resultados do projeto.
 

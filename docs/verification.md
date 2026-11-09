@@ -249,3 +249,51 @@ Em 2026-11-09, a página 3 do PDF foi conferida visualmente e confirmada pelo us
 | `timeout 20s ./build/infinite_service_test "$PWD/build/analyst" "$PWD/build/client"` | Com `s` houve conclusões e cancelamentos. O teste verificou também SIGINT e SIGTERM, ausência de filhos por `ECHILD`, restauração das máscaras e remoção de ambos os semáforos. |
 
 Uma execução finita com N = 11 e X = 10000 ms sob `strace -ff` confirmou a escrita decimal sem quebra de linha, a parada inicial, a abertura de `/sem_atend` após a retomada e a espera do cliente. O Analista gravou `analyst.pid`, parou e imprimiu lotes de 1 e 10. A ordem dos 11 PIDs impressos coincidiu com a ordem das saídas zero recolhidas pelo pai. A execução terminou com `ECHILD` e sem diretório de execução ou semáforos remanescentes. O rastreamento exigiu execução fora da sandbox devido a `ptrace` e não compõe as medições de desempenho. A saturação e a retomada da fila de 100 foram verificadas de forma controlada na US14.
+
+## US22 — Avaliação e rastreabilidade
+
+Em 2026-11-09, `timeout 120s make test`, `timeout 120s make debug` e `timeout 90s make test-client` passaram em sequência sem avisos de compilação. O roteiro de medição recusou N = 0 com status 2. O teste funcional do modo infinito continua em `make test` e `make test-client`, incluindo a comparação da saída do Analista com o denominador do relatório e a restauração de recursos. Após os testes, `run/` não continha diretórios `execution-*` e `/dev/shm` não continha `sem.sem_atend` ou `sem.sem_block`.
+
+| Requisito | Evidência executada |
+|---|---|
+| R01 | Build e `ldd` em Linux (US20). Execução com processos e IPC reais (US21). Busca em `src/` sem cabeçalho ou chamadas `pthread`. |
+| R02 | `scheduler_test` preserva pilhas e contextos distintos, verifica round-robin e espera por evento (US04–US06). |
+| R03 | CLI recusa argumentos inválidos e executa N = 1, 11, 125 e 0 (US13, US21). |
+| R04 | `reception_test` verifica mapeamento equiprovável dos bits usados no sorteio (US14). A proporção observada em uma execução não precisa ser exatamente 50/50. |
+| R05 | `domain_test` e `metrics_test` cobrem X par e ímpar, inclusive 2,5 ms para alta com X = 5 (US01, US03). |
+| R06 | `metrics_test` cobre igualdade e ultrapassagem de 1 ns. `attendant_test` usa cliente retomado após o prazo e espera seu término (US03, US15). |
+| R07 | Finito com os dois clientes valida N criações, N conclusões, N PIDs e taxa satisfeitos/N. Saídas anormais não contam como sucesso (US16, US19, US21). |
+| R08 | Infinito valida `s` com zero e com conclusões. Teste direto confirma cancelamentos excluídos e a CLI confere o denominador (US18, US21). |
+| R09 | Rastreamento de 11 clientes confirma os PIDs impressos na ordem das saídas zero recolhidas (US21). |
+| R10 | `analyst_test` e rastreamento verificam parada inicial e retomada autorizada (US11, US21). |
+| R11 | Teste de arquivo e Analista verifica ordem e resto. Coordenador drena 27 registros em lotes de 10, 10 e 7 (US10–US12). |
+| R12 | Coordenador exige arquivo vazio e parada confirmada. Testes infinitos conferem todos os PIDs concluídos antes do relatório (US12, US18, US21). |
+| R13 | Testes de domínio, demanda e Recepção verificam os campos e a chegada registrada na criação (US01, US08, US14). |
+| R14 | `demand_test` recusa outra inicialização antes do consumo e valida demandas distintas. O cliente do PDF escreve e para na sequência esperada (US08, US21). |
+| R15 | `reception_test` atinge 100, verifica pausa e retomada após liberar vaga (US14). |
+| R16 | `ipc_test` verifica semáforos e propriedade. O Analista cria e o coordenador verifica `analyst.pid`. Testes e rastreamento conferem uso e limpeza (US09, US11–US12, US19, US21). |
+| R17 | Transcrição conferida com o PDF, SHA-256 registrado e execução dos dois modos (US21). |
+| R18 | Conversão monotônica testada. O relatório finito e infinito contém tempo positivo após drenagem e limpeza (US03, US16, US18). |
+
+### Medições finitas
+
+Código do serviço e dos clientes na revisão `a31c421`, compilado com GCC 13.3.0, C17 e `-O2 -g`. Ambiente Linux x86_64 7.0.0-42-generic, glibc 2.39 e Intel Core i5-7200U com quatro CPUs lógicas acessíveis. A carga média de um minuto antes das séries era 2,08. Foi usado o escalonador cooperativo round-robin e EDF não preemptivo com desempate por criação e capacidade de 100 esperas. Cada série executou cinco vezes em sequência, com stdout em arquivo temporário e sem `strace`. O tempo do relatório inclui inicialização, execução, drenagem e limpeza.
+
+```sh
+for client in controlled official; do
+    for count in 11 125; do
+        timeout 240s bash tests/benchmark.sh "$client" "$count" 5 5 || exit 1
+    done
+done
+```
+
+X = 5 ms em todas as séries. Os resultados individuais estão na ordem da execução. Em todas as repetições, criados = concluídos = N e o Analista imprimiu N PIDs distintos antes do relatório. As verificações de semáforos e diretórios de execução passaram após cada série.
+
+| Carga | N | Satisfeitos por repetição | Tempo total por repetição (ms) | Mediana da taxa | Tempo mín. / mediana / máx. (ms) |
+|---|---:|---|---|---:|---|
+| Controlada | 11 | 4, 1, 2, 1, 1 | 332.221 · 825.998 · 258.576 · 406.293 · 175.851 | 9,09% | 175.851 / 332.221 / 825.998 |
+| Controlada | 125 | 3, 3, 5, 4, 2 | 1046.700 · 943.242 · 990.194 · 1076.624 · 1165.255 | 2,40% | 943.242 / 1046.700 / 1165.255 |
+| Enunciado | 11 | 2, 2, 2, 1, 2 | 232.284 · 219.154 · 396.500 · 230.815 · 281.996 | 18,18% | 219.154 / 232.284 / 396.500 |
+| Enunciado | 125 | 2, 2, 2, 1, 2 | 891.813 · 946.166 · 1130.187 · 1375.164 · 964.749 | 1,60% | 891.813 / 964.749 / 1375.164 |
+
+A carga controlada solicita 1000 µs fixos. A do enunciado solicita 1, 5 ou 15 µs e pode repetir demandas dentro do mesmo segundo. As séries documentam as duas cargas separadamente. Com N = 125 e X = 5 ms, a taxa do cliente do enunciado variou de 0,80% a 1,60%. A medição inclui o custo de criar processos, esperar pelo serviço e processar lotes. O rastreamento da US21 mostrou um `execve` por cliente e uma troca de arquivo por lote, mas não isolou o custo de cada etapa. O gargalo dominante e o efeito de mudanças de política permanecem sem medição.
