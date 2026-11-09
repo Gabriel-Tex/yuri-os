@@ -3,6 +3,7 @@
 #include "workers.h"
 
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -14,6 +15,51 @@
 
 #define SERVICE_RUN_SUFFIX "/run"
 #define SERVICE_TEMPLATE "/execution-XXXXXX"
+
+/* Um Analista encerrado durante a troca do arquivo pode deixar o nome
+ * temporário que ele próprio criou no diretório exclusivo desta execução. */
+static bool service_remove_analyst_temporaries(int directory_fd, pid_t pid)
+{
+    if (pid <= 0) return true;
+    char prefix[64];
+    int length = snprintf(prefix, sizeof(prefix), ".completed.%ld.",
+                          (long)pid);
+    if (length < 0 || (size_t)length >= sizeof(prefix)) {
+        errno = EOVERFLOW;
+        return false;
+    }
+    int scan_fd = dup(directory_fd);
+    if (scan_fd == -1) return false;
+    DIR *directory = fdopendir(scan_fd);
+    if (directory == NULL) {
+        int error = errno;
+        close(scan_fd);
+        errno = error;
+        return false;
+    }
+    int error = 0;
+    for (;;) {
+        errno = 0;
+        struct dirent *entry = readdir(directory);
+        if (entry == NULL) {
+            if (errno != 0 && error == 0) error = errno;
+            break;
+        }
+        if (strncmp(entry->d_name, prefix, (size_t)length) != 0) continue;
+        const char *suffix = entry->d_name + length;
+        const char *digit = suffix;
+        while (*digit >= '0' && *digit <= '9') digit++;
+        if (digit == suffix || strcmp(digit, ".tmp") != 0) continue;
+        if (unlinkat(directory_fd, entry->d_name, 0) == -1 && error == 0)
+            error = errno;
+    }
+    if (closedir(directory) == -1 && error == 0) error = errno;
+    if (error != 0) {
+        errno = error;
+        return false;
+    }
+    return true;
+}
 
 static void service_on_event(void *context,
                               const struct processes_event *event)
@@ -41,6 +87,10 @@ bool service_process_events(void *context)
     struct service_state *service = context;
     if (service == NULL || !service->watcher.initialized) {
         errno = EINVAL;
+        return false;
+    }
+    if (interrupt_requested(&service->interruption)) {
+        errno = EINTR;
         return false;
     }
     if (!processes_collect(&service->watcher, service_on_event, service, NULL)) {
@@ -149,8 +199,9 @@ bool service_prepare(struct service_state *service,
     }
     service->config = *config;
     if (!clock_monotonic_ns(&service->start_ns) ||
-        !ipc_service_init(&service->ipc) ||
         !processes_watcher_init(&service->watcher) ||
+        !interrupt_init(&service->interruption) ||
+        !ipc_service_init(&service->ipc) ||
         !service_make_directory(service, config->project_root) ||
         !completion_file_open(&service->completion, service->run_directory,
                               service->ipc.block, true) ||
@@ -411,6 +462,10 @@ bool service_close(struct service_state *service, struct service_result *result)
          service->input.attributes_saved) &&
         !terminal_close(&service->input) && error == 0) error = errno;
     service->input_enabled = false;
+    if ((service->interruption.mask_saved ||
+         service->interruption.int_saved ||
+         service->interruption.term_saved) &&
+        !interrupt_close(&service->interruption) && error == 0) error = errno;
     if (service->watcher.initialized &&
         !processes_watcher_close(&service->watcher) && error == 0) error = errno;
     if (!ipc_service_close(&service->ipc) && error == 0) error = errno;
@@ -418,6 +473,9 @@ bool service_close(struct service_state *service, struct service_result *result)
         int directory_fd = open(service->run_directory,
                                 O_RDONLY | O_DIRECTORY | O_CLOEXEC);
         if (directory_fd != -1) {
+            if (!service_remove_analyst_temporaries(directory_fd,
+                                                     service->analyst_pid) &&
+                error == 0) error = errno;
             if (unlinkat(directory_fd, "analyst.pid", 0) == -1 &&
                 errno != ENOENT && error == 0) error = errno;
             if (unlinkat(directory_fd, COMPLETION_FILE_NAME, 0) == -1 &&

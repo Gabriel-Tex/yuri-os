@@ -4,7 +4,9 @@ Este repositório implementa os modos finito e infinito da primeira parte do tra
 
 No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 
-US01–US18 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente e relatórios finito e infinito. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21.
+`SIGINT` e `SIGTERM` encerram a execução com diagnóstico e status de erro, recolhem os filhos e restauram o terminal e os sinais. Falhas do cliente, do Analista e de I/O também produzem relatório parcial apenas em `stderr`.
+
+US01–US19 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente, relatórios e limpeza controlada. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21.
 
 Para compilar e verificar o domínio, instale um compilador C17 e GNU Make:
 

@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US18 têm implementação e testes com o cliente controlado; US19–US22 permanecem pendentes. A compatibilidade com a fonte oficial ainda não foi demonstrada.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US19 têm implementação e testes com o cliente controlado; US20–US22 permanecem pendentes. A compatibilidade com a fonte oficial ainda não foi demonstrada.
 
 ## Como usar o backlog
 
@@ -292,7 +292,7 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Tipo:** funcional · **Depende de:** US03, US06, US09 · **Cobre:** R01–R03; D01, D09, D13.
 
-**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI finita foi ligada ao atendimento na US16. N = 0 ainda termina com código 2 após preparar e liberar recursos, pois a leitura de `s` e o encerramento infinito pertencem às US17–US18.
+**Estado:** preparação e validação implementadas em 2026-11-08, com testes em [verification.md](verification.md#us13--entrada-e-preparação). A CLI finita foi ligada ao atendimento na US16 e N = 0 ao modo infinito na US18.
 
 **História:** como executor, quero informar N e X e receber erro claro quando a configuração for inválida.
 
@@ -314,7 +314,7 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Tipo:** funcional · **Depende de:** US02, US06, US08, US13 · **Cobre:** R02–R05, R13–R15.
 
-**Estado:** Recepção implementada e verificada isoladamente em 2026-11-08. `app/workers` cria N = 1 e N = 125, continua em N = 0 até uma parada controlada, respeita 100 vagas, sorteia prioridades e só enfileira após ler a demanda. O teste e as limitações estão em [verification.md](verification.md#us14--geração-na-recepção). A CLI ainda usa rotinas de preparação; o atendimento real e o comando `s` pertencem às histórias seguintes.
+**Estado:** Recepção implementada e verificada isoladamente em 2026-11-08. `app/workers` cria N = 1 e N = 125, continua em N = 0 até uma parada controlada, respeita 100 vagas, sorteia prioridades e só enfileira após ler a demanda. O teste e as limitações estão em [verification.md](verification.md#us14--geração-na-recepção). A ligação ao atendimento e à CLI foi concluída nas US16 e US18.
 
 **História:** como executor, quero gerar a quantidade informada de clientes, com prioridades sorteadas e limite de espera respeitado.
 
@@ -427,6 +427,8 @@ Resultado: parar o serviço sem perder registros concluídos nem deixar recursos
 ### US19 — Consolidar erros e limpeza parcial
 
 **Tipo:** técnico · **Depende de:** US13, US15, US18 · **Cobre:** R01, R07–R09, R12, R16–R18.
+
+**Estado:** concluída em 2026-11-09. `SIGINT`/`SIGTERM` passam pelo encerramento controlado, erros mantêm o relatório parcial como falha e a limpeza recolhe clientes e Analista mesmo com lotes interrompidos. Testes em [verification.md](verification.md#us19--erros-e-limpeza-controlada).
 
 **Entrega:** caminho único de encerramento para erros já tratados localmente nas histórias anteriores.
 

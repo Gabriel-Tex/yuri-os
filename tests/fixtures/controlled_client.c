@@ -24,6 +24,18 @@ static int check_descriptor(const char *number)
 
 int main(int argc, char **argv)
 {
+    /* O modo por ambiente permite injetar falhas na CLI sem alterar o
+     * contrato de argumentos do cliente usado pelo serviço. */
+    const char *mode = getenv("CONTROLLED_CLIENT_MODE");
+    char *mode_arguments[3];
+    if (argc == 1 && mode != NULL && mode[0] != '\0')
+    {
+        mode_arguments[0] = argv[0];
+        mode_arguments[1] = (char *)mode;
+        mode_arguments[2] = NULL;
+        argv = mode_arguments;
+        argc = 2;
+    }
     if (argc == 1 || (argc == 2 &&
         (strcmp(argv[1], "service_late") == 0 ||
          strcmp(argv[1], "service_signal") == 0)))

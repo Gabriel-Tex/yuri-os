@@ -5,6 +5,7 @@
 #include "platform/clock.h"
 #include "platform/completion_file.h"
 #include "platform/ipc.h"
+#include "platform/interrupt.h"
 #include "platform/processes.h"
 #include "platform/terminal.h"
 #include "runtime/scheduler.h"
@@ -37,6 +38,7 @@ typedef void (*service_client_event_handler)(void *context,
 struct service_state {
     struct service_config config;
     struct ipc_service ipc;
+    struct interrupt_watcher interruption;
     struct processes_watcher watcher;
     struct completion_file completion;
     struct scheduler scheduler;

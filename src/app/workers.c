@@ -248,10 +248,6 @@ bool workers_reception_close(struct workers_reception *reception)
                                workers_cleanup_event, &cleanup, NULL)) {
             return false;
         }
-        if (cleanup.error != 0) {
-            errno = cleanup.error;
-            return false;
-        }
         if (cleanup.remaining > 0 &&
             !processes_wait(&reception->service->watcher)) return false;
     }
@@ -280,7 +276,12 @@ bool workers_reception_close(struct workers_reception *reception)
         reception->service->client_context = NULL;
         reception->service->client_handler = NULL;
     }
-    return demand_close(&reception->demand);
+    bool closed = demand_close(&reception->demand);
+    if (cleanup.error != 0) {
+        errno = cleanup.error;
+        return false;
+    }
+    return closed;
 }
 
 bool workers_attendant_init(struct workers_attendant *attendant,
@@ -421,6 +422,7 @@ bool workers_attendant_close(struct workers_attendant *attendant)
         errno = EINVAL;
         return false;
     }
+    int cleanup_error = 0;
     if (attendant->active_valid && !attendant->active_reaped) {
         struct workers_cleanup_state cleanup = {.service = attendant->service,
             .pids = {attendant->active.pid}, .count = 1, .remaining = 1};
@@ -429,14 +431,13 @@ bool workers_attendant_close(struct workers_attendant *attendant)
         while (cleanup.remaining > 0) {
             if (!processes_collect(&attendant->service->watcher,
                                    workers_cleanup_event, &cleanup, NULL) ||
-                cleanup.error != 0 ||
                 (cleanup.remaining > 0 &&
                  !processes_wait(&attendant->service->watcher))) {
-                if (cleanup.error != 0) errno = cleanup.error;
                 return false;
             }
         }
         attendant->active_reaped = true;
+        cleanup_error = cleanup.error;
     }
     if (attendant->active_valid &&
         attendant->active.state == CLIENT_IN_SERVICE &&
@@ -444,5 +445,9 @@ bool workers_attendant_close(struct workers_attendant *attendant)
         return false;
     }
     attendant->active_valid = false;
+    if (cleanup_error != 0) {
+        errno = cleanup_error;
+        return false;
+    }
     return true;
 }

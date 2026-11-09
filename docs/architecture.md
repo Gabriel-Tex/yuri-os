@@ -1,6 +1,6 @@
 # Arquitetura do atendimento de clientes
 
-Esta arquitetura cobre a primeira parte do trabalho prático. Registro (US01), fila (US02), métricas e conversão de tempo (US03), contextos de threads de usuário (US04), despacho round-robin (US05), espera por condição (US06), adaptação de processos (US07), leitura serializada da demanda (US08), IPC (US09), arquivo de PIDs (US10), processo Analista (US11), coordenação dos lotes (US12), preparação do serviço (US13) e Recepção (US14) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
+Esta arquitetura cobre a primeira parte do trabalho prático. Registro, fila, métricas, threads de usuário, processos, IPC, Analista, atendimento finito, parada do modo infinito e limpeza controlada (US01–US19) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
 ## Fontes e alcance
 
@@ -94,6 +94,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │       ├── ipc.{h,c}
 │       ├── completion_file.{h,c}
 │       ├── terminal.{h,c}
+│       ├── interrupt.{h,c}
 │       └── clock.{h,c}
 ├── tests/
 │   ├── domain_test.c
@@ -108,6 +109,9 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── service_cli_test.sh
 │   ├── reception_test.c
 │   ├── integration_test.sh
+│   ├── terminal_test.c
+│   ├── infinite_service_test.{c,sh}
+│   ├── error_service_test.sh
 │   └── fixtures/controlled_client.c
 ├── build/
 └── run/
@@ -141,6 +145,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/platform/ipc.h` / `.c` | Definir e implementar propriedade, aquisição, liberação e limpeza de semáforos e bloqueio de instância. |
 | `src/platform/completion_file.h` / `.c` | Definir formato/operações e implementar inclusão e consumo ordenado de até dez PIDs. |
 | `src/platform/terminal.h` / `.c` | Definir e implementar leitura de s, entrada não bloqueante e restauração do terminal. |
+| `src/platform/interrupt.h` / `.c` | Registrar `SIGINT` e `SIGTERM` com flag segura e restaurar máscara e handlers. |
 | `src/platform/clock.h` / `.c` | Definir instantes/durações e implementar relógio monotônico e conversões verificadas. |
 | `tests/domain_test.c` | Cobrir fila, prioridade, prazo e métricas com tempos artificiais. |
 | `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
@@ -153,6 +158,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/service_test.c` / `service_cli_test.sh` | Cobrir preparação, limpeza e validação da entrada com caminhos reais. |
 | `tests/reception_test.c` | Cobrir geração finita, contínua, fila cheia e demanda inválida com filhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
+| `tests/terminal_test.c`, `infinite_service_test.{c,sh}`, `error_service_test.sh` | Verificar entrada, parada, drenagem, sinais e falhas da CLI. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
 ### Limites dos módulos
@@ -288,7 +294,7 @@ Na US11, `analyst` recebe o diretório absoluto da execução, abre `/sem_block`
 
 Não acrescentar PIDs enquanto o Analista consome um lote. Se um cliente terminar nesse intervalo, o Atendente guarda a conclusão pendente até a nova parada; a Recepção ainda pode progredir. Para 27 pendências, a drenagem precisa confirmar lotes de 10, 10 e 7 e verificar o arquivo vazio. Falha de saída ou arquivo encerra com erro; um sinal enviado não é confirmação de impressão. Não há recuperação transacional após crash entre impressão e compactação, que poderia duplicar uma saída.
 
-Na US12, o serviço fornece PID do filho, `completion_file` e `scheduler` ao `analyst_coordinator`. O consumidor único de eventos encaminha as mudanças desse PID ao coordenador. A primeira parada confirma `analyst.pid` e lê a quantidade pendente. Dez PIDs, ociosidade com pendências ou drenagem solicitada autorizam `SIGCONT` somente no estado parado. Enquanto o Analista está ativo, `try_append` não bloqueia nem grava; o Atendente conserva o PID e pode esperar `ANALYST_COORDINATOR_EVENT`, permitindo à Recepção progredir. A parada seguinte confirma que o arquivo perdeu exatamente o lote esperado antes de autorizar outro despertar. A drenagem exige estado parado, contador zero e arquivo vazio. Saída do Analista antes da finalização esperada é erro. O teste cobre esses estados com processo e duas threads de usuário reais; a ligação ao serviço completo pertence à US13–US16.
+Na US12, o serviço fornece PID do filho, `completion_file` e `scheduler` ao `analyst_coordinator`. O consumidor único de eventos encaminha as mudanças desse PID ao coordenador. A primeira parada confirma `analyst.pid` e lê a quantidade pendente. Dez PIDs, ociosidade com pendências ou drenagem solicitada autorizam `SIGCONT` somente no estado parado. Enquanto o Analista está ativo, `try_append` não bloqueia nem grava; o Atendente conserva o PID e pode esperar `ANALYST_COORDINATOR_EVENT`, permitindo à Recepção progredir. A parada seguinte confirma que o arquivo perdeu exatamente o lote esperado antes de autorizar outro despertar. A drenagem exige estado parado, contador zero e arquivo vazio. Saída do Analista antes da finalização esperada é erro. O teste cobre esses estados com processo e duas threads de usuário reais; as US16 e US18 ligam a coordenação aos modos finito e infinito.
 
 ### Encerramento
 
@@ -304,6 +310,8 @@ Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINI
 - **Finalização:** encerrar o Analista parado com `SIGTERM` e `SIGCONT`, recolhê-lo, liberar recursos em ordem inversa, restaurar terminal e máscaras de sinais, encerrar a medição e emitir o relatório. Clientes ainda parados que foram cancelados podem receber `SIGKILL`, seguido de recolhimento.
 
 `SIGINT` e `SIGTERM` solicitam limpeza controlada e diagnóstico. Em N = 0, EOF antes de s é erro para não deixar uma execução sem mecanismo de parada; no finito, EOF apenas desativa o monitoramento da entrada. Entrada redirecionada aceita o byte s; somente TTY exige alteração de `termios`.
+
+Na US19, `platform/interrupt` bloqueia `SIGINT` e `SIGTERM` fora da espera e os libera temporariamente em `pselect`, usando a máscara original registrada pelo observador de processos. Os handlers apenas registram uma flag; o serviço detecta a interrupção entre etapas e entra no fechamento comum com status de erro. O observador é instalado primeiro para que os filhos recebam a máscara anterior ao bloqueio dos sinais de interrupção. A restauração desfaz a máscara e as disposições do processo pai. Se o Analista for encerrado durante uma compactação, `service_close` remove apenas temporários com seu PID no diretório exclusivo da execução, após recolhê-lo.
 
 ## Tempo, métricas e cliente de referência
 
