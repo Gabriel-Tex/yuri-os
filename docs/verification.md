@@ -237,3 +237,15 @@ Em 2026-11-09, `timeout 120s make test` e `timeout 120s make debug` passaram sem
 Em 2026-11-09, em uma cópia isolada das fontes, `make clean` seguido de `timeout 120s make -j4 test` compilou o código próprio em C17 com `-Wall -Wextra -Wpedantic` e passou sem avisos. `make -n -W src/domain/client.h build/service` indicou recompilação de `client.c` e `service.c`. `ldd` em `build/service` e `build/analyst` listou a libc e os componentes do carregador Linux.
 
 `make client` retornou erro com indicação de `provided/client.c` quando a fonte estava ausente. Na mesma cópia, `make clean` removeu `build/` e preservou o marcador `run/keep` e `src/service_main.c`. Depois, `make client` compilou a listagem extraída da página 3 do PDF, sem editar o código. A verificação do protocolo e da execução com essa fonte pertence à US21.
+
+## US21 — Cliente do enunciado
+
+Em 2026-11-09, a página 3 do PDF foi conferida visualmente e confirmada pelo usuário como fonte oficial da entrega. O PDF do ZIP de estudos tem o mesmo SHA-256 do arquivo no repositório e não contém anexos. A origem e o hash da transcrição estão em [provided/README.md](../provided/README.md). A integração existente aceitou a listagem sem adaptações.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout 120s make -j4 test` | Suíte controlada passou sem avisos de compilação. |
+| `timeout 90s make test-client` | Finito com N = 1, 11 e 125, X = 10000 ms, e infinito com `s` imediato, `s` após 0,7 s e EOF. A CLI encontrou o cliente irmão com `SERVICE_CLIENT_PATH` desativado. PIDs únicos, totais e denominadores conferidos. |
+| `timeout 20s ./build/infinite_service_test "$PWD/build/analyst" "$PWD/build/client"` | Com `s` houve conclusões e cancelamentos. O teste verificou também SIGINT e SIGTERM, ausência de filhos por `ECHILD`, restauração das máscaras e remoção de ambos os semáforos. |
+
+Uma execução finita com N = 11 e X = 10000 ms sob `strace -ff` confirmou a escrita decimal sem quebra de linha, a parada inicial, a abertura de `/sem_atend` após a retomada e a espera do cliente. O Analista gravou `analyst.pid`, parou e imprimiu lotes de 1 e 10. A ordem dos 11 PIDs impressos coincidiu com a ordem das saídas zero recolhidas pelo pai. A execução terminou com `ECHILD` e sem diretório de execução ou semáforos remanescentes. O rastreamento exigiu execução fora da sandbox devido a `ptrace` e não compõe as medições de desempenho. A saturação e a retomada da fila de 100 foram verificadas de forma controlada na US14.

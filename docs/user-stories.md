@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US19 têm implementação e testes com o cliente controlado; US20–US22 permanecem pendentes. A compatibilidade com a fonte oficial ainda não foi demonstrada.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US21 estão verificadas, inclusive a integração com a listagem de `cliente.c` confirmada para a entrega. A avaliação pertence à US22.
 
 ## Como usar o backlog
 
@@ -374,7 +374,7 @@ Resultado: executar o modo finito do início ao relatório.
 
 **Verificação:** N = 1, 11 e > 100; cada PID concluído aparece uma vez na execução normal, satisfeitos + insatisfeitos = N e nenhum filho permanece.
 
-**Estado:** concluída em 2026-11-08 com o cliente controlado, conforme [verification.md](verification.md#us16--execução-finita-e-relatório). A CLI resolve `client` ao lado do serviço e pode receber um caminho absoluto explícito por `SERVICE_CLIENT_PATH` nos testes. A compatibilidade com a fonte oficial ainda depende da US21.
+**Estado:** concluída em 2026-11-08 com o cliente controlado, conforme [verification.md](verification.md#us16--execução-finita-e-relatório). A CLI resolve `client` ao lado do serviço e pode receber um caminho absoluto explícito por `SERVICE_CLIENT_PATH` nos testes. A US21 verificou a compatibilidade com a listagem do enunciado.
 
 ## E06 — Interrupção e falhas
 
@@ -475,6 +475,8 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 ### US21 — Conferir o cliente oficial
 
 **Tipo:** funcional · **Depende de:** US16, US18–US20 · **Cobre:** R01–R18; P01–P05.
+
+**Estado:** concluída em 2026-11-09. A fonte confirmada está em `provided/client.c`, com origem e versão documentadas. Os testes executaram os dois modos com o binário correspondente. [Registro de verificação](verification.md#us21--cliente-do-enunciado).
 
 **História:** como avaliador, quero executar o fluxo com o cliente entregue pelo professor para verificar o protocolo real.
 

@@ -35,7 +35,7 @@ O trabalho é uma aplicação de espaço de usuário em Linux. Shell, memória v
 | R17 | Integrar o cliente fornecido, preservando sua carga e seu comportamento. | Texto, p. 1; nota 5 |
 | R18 | Informar o tempo total da execução. | Texto, p. 1; nota 8 |
 
-O PDF ilustra o cliente, mas o ZIP não contém um arquivo `client.c` independente. A fonte oficial precisa ser conferida antes de declarar a integração concluída.
+A página 3 do PDF contém a listagem confirmada para a entrega. Sua transcrição e a identificação da versão constam em [provided/README.md](../provided/README.md).
 
 ## Decisões adotadas
 
@@ -130,7 +130,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `docs/user-stories.md` | Organizar entregas, aceite, dependências e rastreabilidade. |
 | `docs/verification.md` | Registrar comandos, resultados e condições de medição efetivamente usados. |
 | `provided/README.md` | Registrar origem, versão e peculiaridades do cliente oficial. |
-| `provided/client.c` | Preservar a fonte oficial quando recebida ou conferida; não usar a fixture de teste como substituta. |
+| `provided/client.c` | Preservar a listagem de `cliente.c` confirmada para a entrega. |
 | `src/service_main.c` | Validar `N` e `X`, iniciar o serviço e apresentar o relatório. |
 | `src/analyst_main.c` | Executar a parada inicial e um lote por despertar do Analista. |
 | `src/domain/client.h` / `.c` | Definir registro, unidades e transições verificadas do cliente, sem I/O ou processos. O uso de `pid_t` é compatível com o alvo Linux. |
@@ -239,7 +239,7 @@ Quando ambas esperam, `pselect` aguarda entrada e sinais. A máscara de sinais p
 
 Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` recusa `demanda.txt` preexistente e uma segunda inicialização ativa, lê o relógio antes de `fork` e devolve PID e chegada relativos ao início informado pelo serviço. O caminho de trabalho do filho precisa designar o mesmo diretório aberto. O consumidor único de eventos chama `demand_observe` com o evento do PID ativo; somente a parada por `SIGSTOP` autoriza `demand_consume`. Uma saída antes da parada é erro e libera a sessão, mas o evento terminal já foi recolhido por `processes_collect`.
 
-`demand_consume` aceita um inteiro decimal não negativo em microssegundos, com no máximo uma quebra de linha final, verifica o intervalo de `uint64_t` e remove o arquivo somente após leitura válida. A sessão só libera uma nova criação após essa remoção. Erro de arquivo ou conteúdo mantém a sessão e o arquivo para diagnóstico; o serviço deve tratar a falha, cancelar/recolher o cliente parado e chamar `demand_abort`. O adaptador não enfileira clientes nem converte a demanda para milissegundos. A fixture controlada verifica o protocolo; a fonte oficial ainda precisa ser conferida na US21.
+`demand_consume` aceita um inteiro decimal não negativo em microssegundos, com no máximo uma quebra de linha final, verifica o intervalo de `uint64_t` e remove o arquivo somente após leitura válida. A sessão só libera uma nova criação após essa remoção. Erro de arquivo ou conteúdo mantém a sessão e o arquivo para diagnóstico; o serviço deve tratar a falha, cancelar/recolher o cliente parado e chamar `demand_abort`. O adaptador não enfileira clientes nem converte a demanda para milissegundos. O teste com a listagem do enunciado verifica também a demanda decimal sem quebra de linha.
 
 Na US09, `ipc_service_init` mantém um lock com `flock` em `/tmp/service-simulator-<uid>.lock` durante a execução. O inode permanece após o fechamento para impedir que duas instâncias bloqueiem arquivos diferentes. O serviço cria `/sem_atend` e `/sem_block` com `O_CREAT | O_EXCL`, valor inicial 1 e posse registrada; recurso já existente causa erro sem remoção. `ipc_service_close` fecha handles, remove apenas os nomes criados por esta instância e aceita repetição ou falha parcial. A tentativa `ipc_try_acquire` devolve ocupado sem bloquear em `EAGAIN`; o serviço coordena a espera por evento fora do adaptador. Clientes e Analista podem abrir os nomes existentes sem adquirir sua propriedade. O teste isolado cobre exclusão e limpeza; a integração com o atendimento pertence às histórias posteriores.
 
@@ -278,7 +278,7 @@ Há um único cliente em atendimento. `/sem_atend` existe para o protocolo do cl
 
 Na US15, `workers_attendant_run` retira o menor prazo da fila, notifica a vaga e espera o evento terminal do PID retomado. O callback registra o instante monotônico relativo ao início da execução assim que recolhe a saída normal com status zero; saída por sinal ou status não zero encerra o fluxo com erro. A rotina atualiza métricas uma vez e conserva o PID até que o coordenador permita anexá-lo ao arquivo. Se o Analista estiver ativo, espera sua parada pelo evento do escalonador antes de iniciar outro atendimento. A limpeza de um atendimento incompleto ocorre fora do contexto de usuário e recolhe o filho.
 
-Na US16, `service_run_finite` cria Recepção e Atendente no mesmo escalonador, encaminha os eventos de cada PID ao proprietário e só confirma sucesso com criados e concluídos iguais a N, sem cancelamentos ou falhas. Após o término das duas rotinas, solicita drenagem, espera as paradas do Analista até `completed.log` ficar vazio e devolve os contadores. `service_close` recolhe o Analista, libera recursos e mede o tempo total até depois da limpeza; a CLI imprime o relatório apenas após esse retorno. O executável cliente é procurado ao lado de `service`; `SERVICE_CLIENT_PATH` permite indicar um executável absoluto nos testes. Sem o cliente oficial instalado, a CLI informa erro antes de apresentar qualquer taxa. A conferência da fonte oficial permanece na US21.
+Na US16, `service_run_finite` cria Recepção e Atendente no mesmo escalonador, encaminha os eventos de cada PID ao proprietário e só confirma sucesso com criados e concluídos iguais a N, sem cancelamentos ou falhas. Após o término das duas rotinas, solicita drenagem, espera as paradas do Analista até `completed.log` ficar vazio e devolve os contadores. `service_close` recolhe o Analista, libera recursos e mede o tempo total até depois da limpeza; a CLI imprime o relatório apenas após esse retorno. O executável cliente é procurado ao lado de `service`; `SERVICE_CLIENT_PATH` permite indicar um executável absoluto nos testes. Sem o cliente oficial instalado, a CLI informa erro antes de apresentar qualquer taxa. A US21 verifica essa resolução com a listagem do enunciado compilada.
 
 ### Analista e arquivo
 
@@ -332,7 +332,7 @@ A resposta usa subtração sem sinal `conclusão - chegada` somente depois de co
 | Zero concluídos | Taxa não aplicável, com contador zero; sem divisão por zero. |
 | Tempo total | Da inicialização antes dos recursos/filhos até o fim da drenagem e limpeza, imediatamente antes do relatório. |
 
-O cliente ilustrado no PDF determina estes pontos de integração:
+O cliente da página 3 do PDF determina estes pontos de integração:
 
 | ID | Comportamento observado |
 |---|---|
@@ -340,7 +340,9 @@ O cliente ilustrado no PDF determina estes pontos de integração:
 | P02 | Depois de `SIGCONT`, abre `/sem_atend` e usa o semáforo durante seu atendimento. |
 | P03 | Passa a demanda diretamente a `usleep`, em **microssegundos**; X permanece em **milissegundos**. Não alterar unidades para aproximá-las. |
 | P04 | Usa `srand(time(NULL))`; clientes próximos podem gerar demandas iguais. Não mudar a fonte oficial por esse motivo. |
-| P05 | A versão do PDF é referência. Conferir o arquivo oficial, quando disponível, e documentar qualquer diferença antes de adaptar o serviço. |
+| P05 | A listagem da página 3 é a fonte da entrega. Se houver uma revisão do professor, conferir e documentar diferenças antes de adaptar o serviço. |
+
+`make test-client` executa os testes de CLI com o binário irmão `client`, resolvido pelo próprio serviço. A suíte controlada continua exercitando o limite da fila e injetando falhas.
 
 ## Propriedade dos recursos e falhas
 

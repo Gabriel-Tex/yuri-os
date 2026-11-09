@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 service_path=$1
-client_path=$2
+client_env=(env -u SERVICE_CLIENT_PATH)
+if [[ $# -eq 2 ]]; then
+    client_env+=("SERVICE_CLIENT_PATH=$2")
+fi
 test_dir=$(mktemp -d /tmp/service-us18-XXXXXX)
 trap 'rm -f -- "$test_dir/out" "$test_dir/err"; rmdir -- "$test_dir"' EXIT
 
@@ -31,18 +34,18 @@ check_report() {
     ' "$test_dir/out"
 }
 
-printf s | timeout 20s env SERVICE_CLIENT_PATH="$client_path" \
+printf s | timeout 20s "${client_env[@]}" \
     "$service_path" 0 10000 >"$test_dir/out" 2>"$test_dir/err"
 check_report
 [[ $(awk '/^concluídos: / { print $2 }' "$test_dir/out") -eq 0 ]]
 
 { printf x; sleep 0.7; printf s; } | timeout 20s \
-    env SERVICE_CLIENT_PATH="$client_path" "$service_path" 0 10000 \
+    "${client_env[@]}" "$service_path" 0 10000 \
     >"$test_dir/out" 2>"$test_dir/err"
 check_report
 [[ $(awk '/^concluídos: / { print $2 }' "$test_dir/out") -gt 0 ]]
 
-if timeout 20s env SERVICE_CLIENT_PATH="$client_path" \
+if timeout 20s "${client_env[@]}" \
     "$service_path" 0 10000 </dev/null >"$test_dir/out" \
     2>"$test_dir/err"; then
     echo 'EOF no modo infinito foi aceito' >&2
