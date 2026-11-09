@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US22 estão verificadas com os cenários e as limitações registrados em [verification.md](verification.md).
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). As verificações de US01–US22 continuam registradas. A auditoria posterior encontrou lacunas de conformidade e casos de falha fora da cobertura existente. O fechamento da primeira parte depende de US23–US27. [Evidências da auditoria](verification.md#auditoria-de-conformidade-após-o-épico-7).
 
 ## Como usar o backlog
 
@@ -516,6 +516,90 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 **Verificação:** comparar relatórios, denominadores, ordem dos lotes e resíduos do sistema. Não prometer nota ou desempenho sem medição.
 
+## E08 — Conformidade e fechamento da primeira parte
+
+Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. As histórias deste épico estão pendentes.
+
+### US23 — Cumprir o protocolo de sincronização do diagrama
+
+**Tipo:** funcional · **Depende de:** US12, US15, US18, US21 · **Cobre:** R02, R09–R12, R16–R17.
+
+**História:** como avaliador, quero que Recepção, Atendente, Cliente e Analista cumpram as etapas de sincronização do anexo para poder conferir o fluxo em execução.
+
+**Lacuna:** na página 2, a Recepção cria os semáforos, o Atendente aguarda a abertura de `sem_atend` após retomar o Cliente e o Atendente desperta o Analista. Hoje a preparação do serviço cria ambos os semáforos. O Atendente espera a saída do filho, mas não verifica `sem_atend`. O laço de eventos também inicia lotes, inclusive os da drenagem após o término do Atendente. [Preparação e laço de eventos](../src/app/service.c) · [Atendente](../src/app/workers.c).
+
+**Aceite:**
+
+- A Recepção cria `/sem_atend` e `/sem_block` por meio do adaptador de IPC. A criação ocorre antes do acesso do Analista ou dos clientes. Inicialização parcial e segunda instância preservam recursos alheios.
+- Após retomar o cliente, o Atendente verifica a disponibilidade de `/sem_atend` no ponto em que o atendimento pode ser confirmado. A disponibilidade anterior à aquisição pelo cliente é insuficiente. O registro do PID e a contabilização exigem também a saída normal com status zero. A verificação preserva o valor do semáforo e não bloqueia a Recepção nem gira esperando.
+- Cada despertar para imprimir, inclusive durante a drenagem, decorre de solicitação do Atendente. O coordenador pode executar o envio do sinal em seu nome. O Analista só processa após parada confirmada, protege o arquivo com `/sem_block`, imprime até dez PIDs em ordem e remove apenas os impressos. Seu PID no arquivo corresponde ao filho criado. O encerramento ocorre após a drenagem confirmada.
+- A fonte, a carga e a temporização do cliente fornecido permanecem conforme a página 3.
+
+**Verificação:** observar criação dos semáforos, retomadas e registro de PIDs com o cliente fornecido. Com a fixture, atrasar a aquisição de `/sem_atend` e provocar saída anormal ou saída zero deixando o semáforo ocupado. Confirmar que não há conclusão bem-sucedida nesses caminhos. Conferir lotes parciais e sucessivos e a origem da solicitação de cada despertar.
+
+### US24 — Preservar a coleta de todos os filhos durante falhas
+
+**Tipo:** técnico · **Depende de:** US07, US19 · **Cobre:** R07–R08, R12, R16.
+
+**Entrega:** associar cada estado terminal ao proprietário do PID, tanto em execução quanto na limpeza, para que uma falha não impeça o encerramento.
+
+**Lacuna:** a coleta pode recolher um cliente enfileirado, encaminhar o evento ao Atendente e deixar o PID na fila. A limpeza continua esperando um novo evento desse filho, embora ele já tenha sido recolhido. Os callbacks de limpeza do Atendente e da Recepção também filtram conjuntos distintos, enquanto a coleta consulta todos os filhos com `waitpid(-1, ...)`. [Eventos e limpeza](../src/app/workers.c) · [Coletor](../src/platform/processes.c).
+
+**Aceite:**
+
+- Cada evento terminal observado para Cliente ou Analista é registrado uma vez. Filhos em inicialização, na fila e em atendimento mantêm estados de propriedade coerentes durante a transição para a limpeza. O serviço não sinaliza um PID já recolhido.
+- Uma saída inesperada gera diagnóstico e status de erro. Eventos agrupados e falhas simultâneas não deixam a limpeza esperando por evento consumido ou por filho inexistente. O relatório parcial não inclui como sucesso um cliente que falhou ou morreu antes do atendimento.
+- Ao final da saída controlada, não há filhos vivos ou zumbis nem recursos próprios pendentes. Terminal e disposições e máscaras de sinais do pai são restaurados. O término do Analista não depende de o chamador ter deixado `SIGTERM` desbloqueado.
+
+**Verificação:** reproduzir sob watchdog a saída de um cliente já enfileirado e a chegada, numa coleta, de eventos do cliente ativo e de clientes sob responsabilidade da Recepção. Verificar também falha durante a inicialização e encerramento com `SIGTERM` originalmente bloqueado. Conferir status, `ECHILD`, semáforos, arquivos e estado do terminal.
+
+### US25 — Garantir a parada por `s` sob carga e em cada fase
+
+**Tipo:** funcional · **Depende de:** US17–US18, US23–US24 · **Cobre:** R03, R08–R12, R15.
+
+**História:** como executor do modo infinito, quero que o serviço reconheça `s` mesmo com entrada contínua e termine preservando os atendimentos concluídos.
+
+**Lacuna:** `terminal_poll` acumula a indicação de `s`, mas só a devolve quando a leitura chega a EOF ou fica sem bytes. Uma fonte continuamente pronta pode monopolizar a etapa de eventos. Os testes atuais enviam `s` imediato ou após um intervalo, sem sincronizar a tecla com cada fase do atendimento. [Leitura da entrada](../src/platform/terminal.c) · [Teste da CLI](../tests/infinite_service_test.sh).
+
+**Aceite:**
+
+- A leitura de entrada tem trabalho limitado por passagem e comunica `s` assim que o reconhece, ainda que outros bytes continuem chegando. Eventos de filhos continuam sendo processados com entrada continuamente pronta. Em TTY, `s` funciona sem Enter.
+- Depois de reconhecer `s`, a Recepção não cria outro cliente e o Atendente não inicia outro atendimento. O cliente em atendimento termina. Os demais são cancelados e recolhidos. O Analista termina o lote ativo e drena o restante até a confirmação de arquivo vazio.
+- Com zero conclusões, a taxa é não aplicável. Com conclusões, os PIDs impressos correspondem aos atendimentos, e o denominador exclui cancelados. O terminal e suas flags são restaurados após a saída.
+
+**Verificação:** sincronizar os testes por estado observável, com `s` antes da primeira criação, durante a inicialização de um cliente, com 100 em espera, durante atendimento e durante um lote do Analista. Usar pipe com produtor contínuo e pseudoterminal. Demonstrar também que a fila cheia volta a admitir clientes quando abre vaga durante a execução normal.
+
+### US26 — Alinhar os limites de X e a origem da medição
+
+**Tipo:** funcional · **Depende de:** US01, US03, US13, US21 · **Cobre:** R03, R05–R07, R13, R18 · **Decisões afetadas:** D11, D13.
+
+**História:** como avaliador, quero que toda configuração aceita produza prazos válidos e que a chegada e o tempo total usem o início do programa como referência.
+
+**Lacunas:** a CLI aceita `18446744073709` ms, mas um cliente de prioridade baixa pode estourar `chegada + paciência` após o `fork`. A amostra inicial do relógio ocorre em `service_prepare`, depois da validação de argumentos e da resolução dos executáveis na CLI. A nota 4 da página 2 mede a chegada desde o início do programa e a nota 8 pede o tempo total. [CLI](../src/service_main.c) · [Cálculo do prazo](../src/domain/client.c) · [Origem atual](../src/app/service.c).
+
+**Aceite:**
+
+- A validação e a representação dos prazos compartilham um contrato. Um X aceito não falha por soma com a chegada ou pela prioridade sorteada. Caso a faixa suportada mude, a CLI rejeita o valor fora da faixa antes de criar filhos ou recursos e informa o motivo. O cálculo mantém X/2 exato para X ímpar, a ordem por prazo e a regra de satisfação inclusiva.
+- A CLI coleta a origem monotônica na entrada do programa, antes da leitura de N/X e da resolução de caminhos. A chegada usa a mesma origem, com amostra junto ao `fork` do cliente. A conclusão continua associada à saída normal observada. A duração termina após drenagem e liberação de recursos, antes da emissão do relatório final, que precisa do valor calculado.
+- As unidades e os limites são documentados. A duração do atendimento fornecido continua em microssegundos e X em milissegundos.
+
+**Verificação:** usar instantes determinísticos para a soma no limite, as duas prioridades, X ímpar e igualdade com o prazo. Pela CLI, exercitar o maior X suportado e o primeiro rejeitado. Conferir que a medição inclui preparação e limpeza e mantém a resposta do cliente como conclusão menos chegada.
+
+### US27 — Validar a revisão final contra todos os requisitos
+
+**Tipo:** técnico · **Depende de:** US22–US26 · **Cobre:** R01–R18 e P01–P05.
+
+**Entrega:** evidência reproduzível da versão de entrega, a partir de uma cópia limpa das fontes.
+
+**Aceite:**
+
+- A matriz R01–R18 indica evidência executada para cada requisito do texto e do diagrama, com revisão Git, comando, resultado e limitações. As lacunas da auditoria têm testes de regressão que passam. A história permanece aberta enquanto houver requisito sem evidência ou desvio de conformidade.
+- O build limpo em Linux C17 produz `service`, `analyst` e `client`. `make test`, `make debug` e `make test-client` passam sob watchdog. O hash de `provided/client.c` é conferido. Os testes confirmam as duas threads de usuário, processos reais e o protocolo dos dois semáforos.
+- O cliente do enunciado executa em modo finito com N = 1, 11 e acima de 100 e no infinito com `s`. A fixture demonstra condições que dependem de controle do estado, incluindo fila cheia, saída anormal e parada com lote ativo. As verificações cobrem contadores, taxas, ordem e limite dos lotes, arquivo vazio na drenagem e liberação de recursos.
+- Atualizar a referência de satisfação e tempo total com a versão final, em séries separadas por cliente e cenário. Registrar ambiente, N/X, repetições e a janela medida. Se houver comparação com uma revisão anterior, medir em condições e com janelas equivalentes. O enunciado usa as métricas na avaliação competitiva sem fixar um mínimo de satisfação ou um máximo de tempo.
+
+**Verificação:** revisar `docs/verification.md` e repetir os comandos documentados a partir das fontes de entrega. Encerrar o épico somente após cumprir os critérios anteriores e refletir o resultado no README e na matriz.
+
 ## Dependências de integração
 
 ```mermaid
@@ -530,6 +614,8 @@ flowchart TD
     S --> V[US21: cliente oficial]
     Build[US20: build desde o primeiro módulo] --> V
     V --> P[US22: avaliação]
+    V --> A8[E08: conformidade e fechamento]
+    P --> A8
 ```
 
 As dependências específicas de cada história prevalecem sobre o agrupamento do diagrama. US01 e US04 podem avançar em paralelo, assim como US07 e US09. US15 pode receber uma fila de teste antes de US14. Evitar ciclos entre domínio e processos ou entre runtime e política de atendimento.
@@ -540,22 +626,24 @@ As dependências específicas de cada história prevalecem sobre o agrupamento d
 |---|---|---|
 | R01 — Linux, C e restrição de bibliotecas | US04, US07, US09, US13, US20–US21 | Build Linux, dependências revisadas, execução real. |
 | R02 — Threads e escalonador próprio | US04–US06, US13–US15 | Contextos e pilhas independentes; alternância e progresso durante espera. |
-| R03 — N, X e modo infinito | US13–US14, US16, US18 | N = 1, N > 100, N = 0; entrada inválida. |
+| R03 — N, X e modo infinito | US13–US14, US16, US18, US25–US26 | N = 1, N > 100, N = 0, entrada inválida e limites de X antes de criar filhos. |
 | R04 — Sorteio 50/50 | US14, US22 | Mapeamento uniforme, sem exigir metade exata em amostra. |
-| R05 — Paciência X/X/2 | US01, US03, US14 | X par/ímpar e conversões sem perda. |
-| R06 — Resposta desde a chegada | US03, US15–US16, US22 | Igualdade, ultrapassagem e inclusão de espera/serviço. |
-| R07 — Todos os N e taxa finita | US03, US16, US19, US21 | Criados = concluídos = N em sucesso; falhas visíveis. |
-| R08 — s e taxa infinita | US03, US17–US18, US21 | s em estados distintos, cancelados excluídos e zero concluídos. |
-| R09 — PID em arquivo | US10–US11, US15–US16, US18 | Correspondência entre conclusão, arquivo e saída, sem duplicação normal. |
-| R10 — Analista dorme e acorda | US11–US12, US15 | Parada inicial e despertares coordenados. |
+| R05 — Paciência X/X/2 | US01, US03, US14, US26 | X par e ímpar, conversões sem perda e prazos válidos no limite. |
+| R06 — Resposta desde a chegada | US03, US15–US16, US22, US26 | Igualdade, ultrapassagem e inclusão de espera e serviço. |
+| R07 — Todos os N e taxa finita | US03, US16, US19, US21, US24, US26 | Criados = concluídos = N em sucesso. Falhas visíveis e sem bloqueio da limpeza. |
+| R08 — s e taxa infinita | US03, US17–US18, US21, US25 | s sob entrada contínua e em estados distintos, cancelados excluídos e zero concluídos. |
+| R09 — PID em arquivo | US10–US11, US15–US16, US18, US23 | Correspondência entre conclusão, arquivo e saída, sem duplicação normal. |
+| R10 — Analista dorme e acorda | US11–US12, US15, US23 | Parada inicial e despertares solicitados pelo Atendente, inclusive na drenagem. |
 | R11 — Até dez primeiros por despertar | US10–US12, US16 | 1, 10, 11 e 27 registros; ordem e resto preservados. |
-| R12 — Drenagem infinita | US12, US18–US19, US21 | Lotes sucessivos, paradas confirmadas, arquivo vazio. |
-| R13 — Dados e chegada do cliente | US01–US02, US07–US08, US14 | Registro completo; chegada antes de enfileirar. |
+| R12 — Drenagem infinita | US12, US18–US19, US21, US23–US25 | Lotes sucessivos, paradas confirmadas, arquivo vazio mesmo com s durante lote ativo. |
+| R13 — Dados e chegada do cliente | US01–US02, US07–US08, US14, US26 | Registro completo e chegada na criação relativa ao início do programa. |
 | R14 — Demanda serializada | US08, US14, US21 | Demandas sem sobrescrita; nenhum `QUEUED` incompleto. |
-| R15 — Limite de 100 no infinito | US02, US06, US14, US18 | Reserva, pausa, vaga liberada e retomada. |
-| R16 — Semáforos e PID do Analista | US09–US11, US15, US19, US21 | Identificação correspondente, exclusão e limpeza própria. |
+| R15 — Limite de 100 no infinito | US02, US06, US14, US18, US25 | Reserva, pausa, vaga liberada, retomada e parada com fila cheia. |
+| R16 — Semáforos e PID do Analista | US09–US11, US15, US19, US21, US23–US24 | Criação pela Recepção, verificação de `/sem_atend` pelo Atendente, proteção do arquivo e PID correspondente. |
 | R17 — Cliente oficial preservado | US07–US08, US15, US20–US21 | Fonte conferida e teste com executável oficial. |
-| R18 — Tempo total | US03, US16, US18–US19, US22 | Relógio monotônico e relatório incluindo drenagem/limpeza. |
+| R18 — Tempo total | US03, US16, US18–US19, US22, US26 | Relógio monotônico do início da CLI ao fim da limpeza. |
+
+A US27 aplica a matriz inteira à revisão final. As evidências anteriores registram os casos exercitados em cada etapa.
 
 ## Cenários que atravessam módulos
 

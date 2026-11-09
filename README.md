@@ -2,6 +2,8 @@
 
 Este repositório implementa os modos finito e infinito da primeira parte do trabalho prático: atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário e um processo Analista. A implementação usa C17 para Linux/glibc.
 
+A entrega ainda tem pendências de conformidade com o diagrama e de correção em casos de falha, entrada contínua e valores extremos de X. A revisão final depende dos testes de aceite do épico 8. [Pendências e critérios de fechamento](docs/user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
+
 No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 
 `SIGINT` e `SIGTERM` encerram a execução com diagnóstico e status de erro, recolhem os filhos e restauram o terminal e os sinais. Falhas do cliente, do Analista e de I/O também produzem relatório parcial apenas em `stderr`.

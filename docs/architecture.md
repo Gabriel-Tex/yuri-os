@@ -2,6 +2,8 @@
 
 Esta arquitetura cobre a primeira parte do trabalho prático. Registro, fila, métricas, threads de usuário, processos, IPC, Analista, atendimento finito, parada do modo infinito e limpeza controlada (US01–US19) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
+A auditoria após o épico 7 identificou desvios no protocolo do diagrama e na origem do tempo, além de casos de bloqueio e de validação fora da suíte original. A descrição do fluxo neste documento registra a implementação atual. O épico 8 define os ajustes e o critério de fechamento. [Histórias pendentes](user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
+
 ## Fontes e alcance
 
 Usamos três identificadores para evitar confundir o que foi pedido com o que foi escolhido aqui:
@@ -31,7 +33,7 @@ O trabalho é uma aplicação de espaço de usuário em Linux. Shell, memória v
 | R13 | Guardar PID, chegada, prioridade e demanda. Chegada corresponde à criação do processo, medida desde o início do programa. | Diagrama; nota 4 |
 | R14 | Ler a demanda escrita pelo cliente antes de enfileirá-lo e serializar criações que compartilham esse arquivo. | Diagrama; nota 7 |
 | R15 | No modo infinito, pausar a geração com 100 clientes em espera e retomar quando houver vaga. | Nota 9 |
-| R16 | Seguir o protocolo de semáforos do atendimento e do arquivo, além do arquivo de PID do Analista. | Diagrama; cliente p. 3 |
+| R16 | A Recepção cria os semáforos. Após retomar o Cliente, o Atendente aguarda a disponibilidade de `/sem_atend`. Atendente e Analista protegem o arquivo com `/sem_block`. O Analista grava seu PID antes de dormir. | Diagrama; cliente p. 3 |
 | R17 | Integrar o cliente fornecido, preservando sua carga e seu comportamento. | Texto, p. 1; nota 5 |
 | R18 | Informar o tempo total da execução. | Texto, p. 1; nota 8 |
 
