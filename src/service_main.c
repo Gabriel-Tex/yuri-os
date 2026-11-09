@@ -106,34 +106,6 @@ static char *service_find_client(const char *analyst)
     return client;
 }
 
-struct service_stub_steps {
-    unsigned reception;
-    unsigned attendant;
-    bool failed;
-};
-
-static void service_reception_stub(void *argument)
-{
-    struct service_stub_steps *steps = argument;
-    steps->reception++;
-    if (!scheduler_yield()) {
-        steps->failed = true;
-        return;
-    }
-    steps->reception++;
-}
-
-static void service_attendant_stub(void *argument)
-{
-    struct service_stub_steps *steps = argument;
-    steps->attendant++;
-    if (!scheduler_yield()) {
-        steps->failed = true;
-        return;
-    }
-    steps->attendant++;
-}
-
 int main(int argc, char **argv)
 {
     uint64_t count;
@@ -155,91 +127,55 @@ int main(int argc, char **argv)
                                     .max_patience_ms = patience_ms,
                                     .project_root = root,
                                     .analyst_path = analyst};
-    if (count > 0) {
-        char *client_path = service_find_client(analyst);
-        if (client_path == NULL || access(client_path, X_OK) == -1) {
-            int error = errno;
-            free(client_path);
-            free(root);
-            free(analyst);
-            errno = error;
-            perror("service: cliente não disponível");
-            return EXIT_FAILURE;
-        }
-        struct service_state finite_service = {0};
-        struct service_result finite_result = {0};
-        bool prepared_finite = service_prepare(&finite_service, &config);
-        int error = prepared_finite ? 0 : errno;
-        bool ran_finite = false;
-        if (prepared_finite) {
-            ran_finite = service_run_finite(&finite_service, client_path,
-                                            &finite_result);
-            if (!ran_finite) error = errno;
-        }
-        bool closed_finite = service_close(&finite_service, &finite_result);
-        if (!closed_finite && error == 0) error = errno;
+    char *client_path = service_find_client(analyst);
+    if (client_path == NULL || access(client_path, X_OK) == -1) {
+        int error = errno;
         free(client_path);
         free(root);
         free(analyst);
-        if (!prepared_finite || !ran_finite || !closed_finite ||
-            !finite_result.complete) {
-            errno = error != 0 ? error : EPROTO;
-            perror("service: execução finita");
-            if (prepared_finite && !ran_finite) {
-                fprintf(stderr, "service: execução parcial: criados=%" PRIu64
-                        ", concluídos=%" PRIu64 ", cancelados=%" PRIu64
-                        ", falhos=%" PRIu64 "\n", finite_result.created,
-                        finite_result.completed, finite_result.cancelled,
-                        finite_result.failed);
-            }
-            return EXIT_FAILURE;
-        }
-        printf("criados: %" PRIu64 "\nconcluídos: %" PRIu64
-               "\nsatisfeitos: %" PRIu64 "\ninsatisfeitos: %" PRIu64
-               "\ntaxa de satisfação: %" PRIu64 "/%" PRIu64 " (%.2f%%)\n"
-               "tempo total: %.3f ms\n",
-               finite_result.created, finite_result.completed,
-               finite_result.satisfied,
-               finite_result.completed - finite_result.satisfied,
-               finite_result.satisfied, finite_result.created,
-               100.0 * (double)finite_result.satisfied /
-                   (double)finite_result.created,
-               (double)finite_result.elapsed_ns / 1000000.0);
-        return fflush(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+        errno = error;
+        perror("service: cliente não disponível");
+        return EXIT_FAILURE;
     }
     struct service_state service = {0};
     struct service_result result = {0};
     bool prepared = service_prepare(&service, &config);
-    int preparation_error = prepared ? 0 : errno;
+    int error = prepared ? 0 : errno;
+    bool ran = false;
     if (prepared) {
-        struct service_stub_steps steps = {0};
-        if (!scheduler_create(&service.scheduler, 0,
-                              service_reception_stub, &steps) ||
-            !scheduler_create(&service.scheduler, 1,
-                              service_attendant_stub, &steps) ||
-            !scheduler_run_events(&service.scheduler, service_process_events,
-                                  service_wait_events, &service) ||
-            steps.failed || steps.reception != 2 || steps.attendant != 2) {
-            preparation_error = steps.failed || steps.reception != 2 ||
-                                steps.attendant != 2 ? EPROTO : errno;
-            prepared = false;
-        }
+        ran = count > 0 ? service_run_finite(&service, client_path, &result) :
+                          service_run_infinite(&service, client_path, &result);
+        if (!ran) error = errno;
     }
     bool closed = service_close(&service, &result);
-    int cleanup_error = errno;
+    if (!closed && error == 0) error = errno;
+    free(client_path);
     free(root);
     free(analyst);
-    if (!prepared) {
-        errno = preparation_error;
-        perror("service: preparar execução");
+    if (!prepared || !ran || !closed || !result.complete) {
+        errno = error != 0 ? error : EPROTO;
+        perror(count > 0 ? "service: execução finita" :
+                           "service: execução infinita");
+        if (prepared && !ran) {
+            fprintf(stderr, "service: execução parcial: criados=%" PRIu64
+                    ", concluídos=%" PRIu64 ", cancelados=%" PRIu64
+                    ", falhos=%" PRIu64 "\n", result.created,
+                    result.completed, result.cancelled, result.failed);
+        }
         return EXIT_FAILURE;
     }
-    if (!closed) {
-        errno = cleanup_error;
-        perror("service: liberar execução");
-        return EXIT_FAILURE;
+    printf("criados: %" PRIu64 "\nconcluídos: %" PRIu64
+           "\nsatisfeitos: %" PRIu64 "\ninsatisfeitos: %" PRIu64 "\n",
+           result.created, result.completed, result.satisfied,
+           result.completed - result.satisfied);
+    if (result.completed == 0) {
+        printf("taxa de satisfação: não aplicável\n");
+    } else {
+        uint64_t denominator = count > 0 ? count : result.completed;
+        printf("taxa de satisfação: %" PRIu64 "/%" PRIu64 " (%.2f%%)\n",
+               result.satisfied, denominator,
+               100.0 * (double)result.satisfied / (double)denominator);
     }
-    /* A CLI não informa sucesso acadêmico antes de integrar o atendimento. */
-    fprintf(stderr, "service: entrada aceita e recursos preparados; modo infinito pendente (US17–US18)\n");
-    return 2;
+    printf("tempo total: %.3f ms\n", (double)result.elapsed_ns / 1000000.0);
+    return fflush(stdout) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

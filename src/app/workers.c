@@ -12,19 +12,26 @@ struct workers_cleanup_state {
     bool reaped[CLIENT_QUEUE_CAPACITY + 1];
     size_t count;
     size_t remaining;
+    int error;
 };
 
 static void workers_cleanup_event(void *context,
                                    const struct processes_event *event)
 {
     struct workers_cleanup_state *cleanup = context;
+    if (event->pid == cleanup->service->analyst_pid) {
+        if (event->kind == PROCESSES_EXITED_OK ||
+            event->kind == PROCESSES_EXITED_ERROR ||
+            event->kind == PROCESSES_SIGNALED)
+            cleanup->service->analyst_reaped = true;
+        if (!analyst_coordinator_observe(&cleanup->service->coordinator,
+                                          event) && cleanup->error == 0)
+            cleanup->error = errno;
+        return;
+    }
     if (event->kind != PROCESSES_EXITED_OK &&
         event->kind != PROCESSES_EXITED_ERROR &&
         event->kind != PROCESSES_SIGNALED) return;
-    if (event->pid == cleanup->service->analyst_pid) {
-        cleanup->service->analyst_reaped = true;
-        return;
-    }
     for (size_t i = 0; i < cleanup->count; i++) {
         if (cleanup->pids[i] == event->pid && !cleanup->reaped[i]) {
             cleanup->reaped[i] = true;
@@ -52,7 +59,10 @@ static bool workers_space_available(void *context)
 static bool workers_start_observed(void *context)
 {
     const struct workers_reception *reception = context;
-    return reception->error != 0 || reception->demand.stopped;
+    return reception->error != 0 ||
+           (reception->cancel_starting_on_stop &&
+            *reception->stop_requested) ||
+           reception->demand.stopped;
 }
 
 static uint64_t workers_next_random(struct workers_reception *reception)
@@ -185,6 +195,8 @@ void workers_reception_run(void *argument)
             break;
         }
         if (reception->error != 0) break;
+        if (reception->cancel_starting_on_stop &&
+            *reception->stop_requested) break;
         uint64_t demand_us;
         if (!demand_consume(&reception->demand, &demand_us) ||
             !client_enqueue(&reception->starting, demand_us) ||
@@ -234,6 +246,10 @@ bool workers_reception_close(struct workers_reception *reception)
     while (cleanup.remaining > 0) {
         if (!processes_collect(&reception->service->watcher,
                                workers_cleanup_event, &cleanup, NULL)) {
+            return false;
+        }
+        if (cleanup.error != 0) {
+            errno = cleanup.error;
             return false;
         }
         if (cleanup.remaining > 0 &&
@@ -294,7 +310,8 @@ static bool workers_attendant_has_work(void *context)
 {
     const struct workers_attendant *attendant = context;
     return attendant->queue->count > 0 || *attendant->generation_finished ||
-           attendant->error != 0;
+           attendant->error != 0 ||
+           (attendant->stop_requested != NULL && *attendant->stop_requested);
 }
 
 static bool workers_attendant_terminal(void *context)
@@ -336,6 +353,8 @@ void workers_attendant_run(void *argument)
 {
     struct workers_attendant *attendant = argument;
     while (attendant->error == 0) {
+        if (attendant->stop_requested != NULL && *attendant->stop_requested)
+            break;
         if (attendant->queue->count == 0) {
             if (*attendant->generation_finished) break;
             if (!scheduler_wait(&attendant->service->scheduler,
@@ -410,8 +429,12 @@ bool workers_attendant_close(struct workers_attendant *attendant)
         while (cleanup.remaining > 0) {
             if (!processes_collect(&attendant->service->watcher,
                                    workers_cleanup_event, &cleanup, NULL) ||
+                cleanup.error != 0 ||
                 (cleanup.remaining > 0 &&
-                 !processes_wait(&attendant->service->watcher))) return false;
+                 !processes_wait(&attendant->service->watcher))) {
+                if (cleanup.error != 0) errno = cleanup.error;
+                return false;
+            }
         }
         attendant->active_reaped = true;
     }

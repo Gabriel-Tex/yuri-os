@@ -50,6 +50,21 @@ bool service_process_events(void *context)
         errno = service->event_error;
         return false;
     }
+    if (service->input_enabled && !service->stop_requested) {
+        bool stop = false;
+        bool eof = false;
+        if (!terminal_poll(&service->input, &stop, &eof)) return false;
+        if (stop && !service->stop_requested) {
+            service->stop_requested = true;
+            scheduler_notify(&service->scheduler, WORKERS_START_EVENT);
+            scheduler_notify(&service->scheduler, WORKERS_SPACE_EVENT);
+            scheduler_notify(&service->scheduler, WORKERS_CLIENT_EVENT);
+        }
+        if (eof && !service->stop_requested) {
+            errno = EPIPE;
+            return false;
+        }
+    }
     bool woken;
     return analyst_coordinator_maybe_wake(&service->coordinator, false, &woken);
 }
@@ -61,7 +76,9 @@ bool service_wait_events(void *context)
         errno = EINVAL;
         return false;
     }
-    return processes_wait(&service->watcher);
+    return processes_wait_input(&service->watcher,
+                                service->input_enabled && !service->stop_requested ?
+                                service->input.descriptor : -1);
 }
 
 static bool service_make_directory(struct service_state *service,
@@ -253,6 +270,101 @@ cleanup:
     return true;
 }
 
+bool service_run_infinite(struct service_state *service, const char *client_path,
+                          struct service_result *result)
+{
+    if (service == NULL || !service->initialized ||
+        service->config.client_count != 0 || client_path == NULL ||
+        client_path[0] != '/' || result == NULL) {
+        errno = EINVAL;
+        return false;
+    }
+    if (!terminal_init(&service->input, STDIN_FILENO)) return false;
+    service->input_enabled = true;
+    service->stop_requested = false;
+    struct client_queue queue;
+    struct metrics metrics;
+    struct workers_reception reception = {0};
+    struct workers_attendant attendant = {0};
+    bool reception_ready = false;
+    bool attendant_ready = false;
+    bool succeeded = false;
+    int error = 0;
+    char *client_argv[] = {(char *)client_path, NULL};
+    if (!client_queue_init(&queue) || !metrics_init(&metrics) ||
+        !workers_attendant_init(&attendant, service, &queue, &metrics,
+                                &reception.finished)) return false;
+    attendant.stop_requested = &service->stop_requested;
+    attendant_ready = true;
+    reception_ready = true;
+    if (!workers_reception_init(&reception, service, &queue, &metrics,
+                                client_path, client_argv,
+                                &service->stop_requested)) {
+        error = errno;
+        goto cleanup;
+    }
+    reception.cancel_starting_on_stop = true;
+    reception.other_handler = workers_attendant_on_event;
+    reception.other_context = &attendant;
+    if (!scheduler_create(&service->scheduler, 0, workers_reception_run,
+                          &reception) ||
+        !scheduler_create(&service->scheduler, 1, workers_attendant_run,
+                          &attendant) ||
+        !scheduler_run_events(&service->scheduler, service_process_events,
+                              service_wait_events, service)) {
+        error = errno;
+        goto cleanup;
+    }
+    if (!service->stop_requested || !reception.finished ||
+        !attendant.finished) {
+        error = EPROTO;
+        goto cleanup;
+    }
+    /* Os registros que ainda aguardavam são cancelados antes da drenagem. */
+    if (!workers_attendant_close(&attendant) ||
+        !workers_reception_close(&reception)) {
+        error = errno;
+        goto cleanup;
+    }
+    attendant_ready = false;
+    reception_ready = false;
+    if (!analyst_coordinator_request_drain(&service->coordinator)) {
+        error = errno;
+        goto cleanup;
+    }
+    bool drained = false;
+    while (!drained) {
+        if (!service_process_events(service) ||
+            !analyst_coordinator_is_drained(&service->coordinator, &drained) ||
+            (!drained && !service_wait_events(service))) {
+            error = errno;
+            goto cleanup;
+        }
+    }
+    if (metrics.created != metrics.completed + metrics.cancelled ||
+        metrics.failed != 0 || queue.count != 0 || queue.reserved) {
+        error = EPROTO;
+        goto cleanup;
+    }
+    succeeded = true;
+cleanup:
+    if (attendant_ready && !workers_attendant_close(&attendant) && error == 0)
+        error = errno;
+    if (reception_ready && !workers_reception_close(&reception) && error == 0)
+        error = errno;
+    result->created = metrics.created;
+    result->completed = metrics.completed;
+    result->satisfied = metrics.satisfied;
+    result->cancelled = metrics.cancelled;
+    result->failed = metrics.failed;
+    result->complete = succeeded && error == 0;
+    if (!result->complete) {
+        errno = error != 0 ? error : EPROTO;
+        return false;
+    }
+    return true;
+}
+
 static void service_on_cleanup_event(void *context,
                                       const struct processes_event *event)
 {
@@ -295,6 +407,10 @@ bool service_close(struct service_state *service, struct service_result *result)
         !scheduler_destroy(&service->scheduler) && error == 0) error = errno;
     if (service->completion.initialized &&
         !completion_file_close(&service->completion) && error == 0) error = errno;
+    if ((service->input_enabled || service->input.flags_saved ||
+         service->input.attributes_saved) &&
+        !terminal_close(&service->input) && error == 0) error = errno;
+    service->input_enabled = false;
     if (service->watcher.initialized &&
         !processes_watcher_close(&service->watcher) && error == 0) error = errno;
     if (!ipc_service_close(&service->ipc) && error == 0) error = errno;

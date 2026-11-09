@@ -289,7 +289,13 @@ bool processes_collect(struct processes_watcher *watcher,
 
 bool processes_wait(struct processes_watcher *watcher)
 {
-    if (watcher == NULL || !watcher->initialized || processes_active != watcher)
+    return processes_wait_input(watcher, -1);
+}
+
+bool processes_wait_input(struct processes_watcher *watcher, int descriptor)
+{
+    if (watcher == NULL || !watcher->initialized || processes_active != watcher ||
+        descriptor >= FD_SETSIZE)
     {
         errno = EINVAL;
         return false;
@@ -303,6 +309,15 @@ bool processes_wait(struct processes_watcher *watcher)
     {
         return false;
     }
-    int result = pselect(0, NULL, NULL, NULL, NULL, &wait_mask);
-    return result == 0 || (result == -1 && errno == EINTR);
+    fd_set readers;
+    fd_set *readers_ptr = NULL;
+    int width = 0;
+    if (descriptor >= 0) {
+        FD_ZERO(&readers);
+        FD_SET(descriptor, &readers);
+        readers_ptr = &readers;
+        width = descriptor + 1;
+    }
+    int result = pselect(width, readers_ptr, NULL, NULL, NULL, &wait_mask);
+    return result >= 0 || (result == -1 && errno == EINTR);
 }

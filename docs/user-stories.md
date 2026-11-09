@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US12 estão concluídas; a preparação da US13 e a Recepção da US14 estão implementadas isoladamente, enquanto a execução completa depende das histórias seguintes; US20 tem apenas a base de compilação e testes iniciada. As demais histórias permanecem pendentes.
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente ilustrado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US01–US18 têm implementação e testes com o cliente controlado; US19–US22 permanecem pendentes. A compatibilidade com a fonte oficial ainda não foi demonstrada.
 
 ## Como usar o backlog
 
@@ -405,6 +405,8 @@ Resultado: parar o serviço sem perder registros concluídos nem deixar recursos
 ### US18 — Parar o modo infinito e drenar PIDs
 
 **Tipo:** funcional · **Depende de:** US16, US17 · **Cobre:** R03, R08–R12, R15, R18; D08.
+
+**Estado:** concluída em 2026-11-09. O comando `s` interrompe a criação e a seleção, preserva o atendimento ativo, cancela a espera e drena o Analista. A CLI usa concluídos como denominador e informa taxa não aplicável quando ele é zero. Os testes estão em [verification.md](verification.md#us18--parada-e-drenagem-do-modo-infinito).
 
 **História:** como executor de uma carga contínua, quero parar a geração e receber métricas somente dos clientes concluídos, com todos os seus PIDs impressos.
 

@@ -60,5 +60,8 @@ bool processes_collect(struct processes_watcher *watcher,
 /* Aguarda uma notificação por pselect sem janela entre a verificação e o
  * desbloqueio temporário de SIGCHLD. Chamar após esgotar processes_collect. */
 bool processes_wait(struct processes_watcher *watcher);
+/* Aguarda também a leitura de um descritor, mantendo a troca atômica da
+ * máscara de SIGCHLD. Um descritor negativo preserva a espera só por sinal. */
+bool processes_wait_input(struct processes_watcher *watcher, int descriptor);
 
 #endif

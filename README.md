@@ -1,21 +1,21 @@
 # yuri-os
 
-O adaptador de entrada da US17 reconhece `s` em TTY sem Enter ou em pipe e restaura o estado original na saída controlada. Sua ligação ao modo infinito pertence à US18.
+Este repositório implementa os modos finito e infinito da primeira parte do trabalho prático: atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário e um processo Analista. A implementação usa C17 para Linux/glibc.
 
-Este repositório implementa o fluxo finito da primeira parte do trabalho prático: atendimento de processos clientes, com Recepção e Atendente executados por um escalonador próprio de threads em espaço de usuário e um processo Analista. A implementação usa C17 para Linux/glibc.
+No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 
-US01–US16 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente e relatório finito. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21. O modo infinito com comando `s` permanece nas US17–US18.
+US01–US18 estão implementadas com cliente controlado: registro e transições de estado, fila limitada, métricas, escalonador cooperativo, processos, leitura serializada da demanda, IPC, Analista, Recepção, Atendente e relatórios finito e infinito. O Atendente confirma o término normal de cada cliente antes de contabilizá-lo e registrar seu PID. A fonte oficial do cliente ainda não está disponível em `provided/client.c`; sua conferência e integração pertencem à US21.
 
 Para compilar e verificar o domínio, instale um compilador C17 e GNU Make:
 
 ```sh
-make          # Compila quatorze testes C, a fixture, `analyst` e `service` em build/.
+make          # Compila os testes, a fixture, `analyst` e `service` em build/.
 make test     # Executa os testes C e da CLI, inclusive filhos reais e semáforos.
 make debug    # Compila e testa com -O0 -g3 em build/debug/.
 make clean    # Remove somente build/; preserva fontes e run/.
 ```
 
-`CC`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS` e `LDLIBS` podem ser fornecidos ao Make; C17 e os avisos `-Wall -Wextra -Wpedantic` são acrescentados à compilação. Objetos, dependências de cabeçalhos e binários ficam em `build/`, ignorado pelo Git junto a `run/`. `build/controlled_client` é apenas uma fixture de teste, não o cliente do professor. Para N > 0, `build/service N X` procura `build/client`; enquanto ele não estiver presente, a execução informa erro. Os testes indicam explicitamente `SERVICE_CLIENT_PATH=/caminho/absoluto/build/controlled_client`, sem alterar o contrato de argumentos do serviço. O relatório finito aparece depois dos PIDs e da limpeza, com criados, concluídos, satisfeitos, insatisfeitos, taxa satisfeitos/N e tempo total em milissegundos. Para N = 0, a CLI ainda retorna código 2 com diagnóstico, pois a parada por `s` não foi integrada.
+`CC`, `CPPFLAGS`, `CFLAGS`, `LDFLAGS` e `LDLIBS` podem ser fornecidos ao Make; C17 e os avisos `-Wall -Wextra -Wpedantic` são acrescentados à compilação. Objetos, dependências de cabeçalhos e binários ficam em `build/`, ignorado pelo Git junto a `run/`. `build/controlled_client` é apenas uma fixture de teste, não o cliente do professor. `build/service N X` procura `build/client`; enquanto ele não estiver presente, a execução informa erro. Os testes indicam explicitamente `SERVICE_CLIENT_PATH=/caminho/absoluto/build/controlled_client`, sem alterar o contrato de argumentos do serviço. O relatório aparece depois dos PIDs e da limpeza, com criados, concluídos, satisfeitos, insatisfeitos, taxa e tempo total em milissegundos. No modo finito, a taxa é satisfeitos/N; no infinito, é satisfeitos/concluídos.
 
 - [Arquitetura](docs/architecture.md): requisitos, decisões técnicas, módulos, fluxos e tratamento de recursos.
 - [Histórias de usuário](docs/user-stories.md): ordem de desenvolvimento, critérios de aceitação e rastreabilidade.

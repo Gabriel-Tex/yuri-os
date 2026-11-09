@@ -17,14 +17,6 @@ for arguments in "${invalid[@]}"; do
     fi
 done
 set +e
-(cd /tmp && "$sandbox_dir/service" 0 5 >"$sandbox_dir/out" 2>"$sandbox_dir/err")
-status=$?
-set -e
-if [[ $status -ne 2 ]] || ! grep -q 'modo infinito pendente' "$sandbox_dir/err"; then
-    echo 'preparação válida falhou' >&2
-    exit 1
-fi
-set +e
 (cd /tmp && SERVICE_CLIENT_PATH=/tmp/cliente-inexistente-us16 "$sandbox_dir/service" 1 5 >"$sandbox_dir/out" 2>"$sandbox_dir/err")
 status=$?
 set -e

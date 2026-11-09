@@ -223,3 +223,7 @@ Data: 2026-11-08. Ambiente: Linux x86_64/glibc; C17 com `-Wall`, `-Wextra` e `-W
 ## US17 — Entrada e restauração do terminal
 
 Em 2026-11-09, `make build/terminal_test && timeout 10s ./build/terminal_test` passou. O teste cobriu pipe, pseudoterminal, tecla diferente de `s`, `s` sem Enter, EOF persistente e restauração repetida de flags e atributos. `timeout 120s make test` passou, incluindo os cenários finitos existentes. A ligação do adaptador à execução infinita será verificada na US18.
+
+## US18 — Parada e drenagem do modo infinito
+
+Em 2026-11-09, `timeout 120s make test` passou com C17, `-Wall -Wextra -Wpedantic`. `infinite_service_test.sh` enviou `s` imediatamente e depois de outra tecla com carga em andamento, conferiu PIDs impressos iguais às conclusões, denominador concluídos, tempo positivo e EOF como erro sem relatório de sucesso. `infinite_service_test.c` enviou `s` após um segundo de carga, observou conclusões e cancelamentos, confirmou criados = concluídos + cancelados e verificou ausência de filhos e dos dois semáforos após `service_close`. Cinco execuções adicionais com `s` após 0,7 s passaram sob watchdog externo de 15 s. A execução com a fixture não verifica a compatibilidade com o cliente oficial, ainda indisponível. As taxas e durações observadas não foram usadas como comparação de desempenho.

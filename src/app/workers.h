@@ -34,6 +34,7 @@ struct workers_reception {
     bool starting_active;
     bool starting_record_valid;
     bool starting_reaped;
+    bool cancel_starting_on_stop;
     bool finished;
     int error;
 };
@@ -43,6 +44,7 @@ struct workers_attendant {
     struct client_queue *queue;
     struct metrics *metrics;
     bool *generation_finished;
+    bool *stop_requested;
     struct client_record active;
     uint64_t completion_ns;
     bool active_valid;

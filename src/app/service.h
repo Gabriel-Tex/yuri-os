@@ -6,6 +6,7 @@
 #include "platform/completion_file.h"
 #include "platform/ipc.h"
 #include "platform/processes.h"
+#include "platform/terminal.h"
 #include "runtime/scheduler.h"
 
 #include <stdbool.h>
@@ -40,11 +41,14 @@ struct service_state {
     struct completion_file completion;
     struct scheduler scheduler;
     struct analyst_coordinator coordinator;
+    struct terminal_input input;
     char *run_directory;
     pid_t analyst_pid;
     uint64_t start_ns;
     bool analyst_reaped;
     bool initialized;
+    bool input_enabled;
+    bool stop_requested;
     int event_error;
     service_client_event_handler client_handler;
     void *client_context;
@@ -60,6 +64,8 @@ bool service_wait_events(void *context);
  * o arquivo antes de devolver sucesso. A liberação final é service_close. */
 bool service_run_finite(struct service_state *service, const char *client_path,
                         struct service_result *result);
+bool service_run_infinite(struct service_state *service, const char *client_path,
+                          struct service_result *result);
 bool service_close(struct service_state *service, struct service_result *result);
 
 #endif
