@@ -16,7 +16,7 @@ struct terminal_input {
 
 /* Mantém a entrada não bloqueante; em TTY, desativa o modo canônico e o eco. */
 bool terminal_init(struct terminal_input *input, int descriptor);
-/* Lê todos os bytes disponíveis. EOF é persistente e não causa nova leitura. */
+/* Lê no máximo 256 bytes por passagem. EOF é persistente. */
 bool terminal_poll(struct terminal_input *input, bool *stop_requested,
                    bool *end_of_input);
 /* Restaura os atributos e flags originais, inclusive após preparação parcial. */

@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -62,10 +63,35 @@ static void test_pty(void)
     assert(close(slave) == 0 && close(master) == 0);
 }
 
+static void test_bounded_input(void)
+{
+    char path[] = "/tmp/terminal-us25-XXXXXX";
+    int descriptor = mkstemp(path);
+    assert(descriptor >= 0);
+    assert(unlink(path) == 0);
+    char bytes[4096];
+    memset(bytes, 'x', sizeof(bytes));
+    bytes[512] = 's';
+    assert(write(descriptor, bytes, sizeof(bytes)) == (ssize_t)sizeof(bytes));
+    assert(lseek(descriptor, 0, SEEK_SET) == 0);
+    struct terminal_input input = {0};
+    assert(terminal_init(&input, descriptor));
+    bool stop;
+    bool eof;
+    assert(terminal_poll(&input, &stop, &eof) && !stop && !eof);
+    assert(lseek(descriptor, 0, SEEK_CUR) == 256);
+    assert(terminal_poll(&input, &stop, &eof) && !stop && !eof);
+    assert(terminal_poll(&input, &stop, &eof) && stop && !eof);
+    assert(lseek(descriptor, 0, SEEK_CUR) == 768);
+    assert(terminal_close(&input));
+    assert(close(descriptor) == 0);
+}
+
 int main(void)
 {
     test_pipe();
     test_pty();
+    test_bounded_input();
     struct terminal_input input = {0};
     assert(!terminal_init(&input, -1));
     assert(!input.initialized);

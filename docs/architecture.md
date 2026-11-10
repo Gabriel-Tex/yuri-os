@@ -114,8 +114,9 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── integration_test.sh
 │   ├── terminal_test.c
 │   ├── infinite_service_test.{c,sh}
+│   ├── stop_phase_test.c
 │   ├── error_service_test.sh
-│   └── fixtures/controlled_client.c
+│   └── fixtures/{controlled_client,slow_analyst}.c
 ├── build/
 └── run/
 ```
@@ -163,6 +164,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/reception_test.c` | Cobrir geração finita, contínua, fila cheia e demanda inválida com filhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/terminal_test.c`, `infinite_service_test.{c,sh}`, `error_service_test.sh` | Verificar entrada, parada, drenagem, sinais e falhas da CLI. |
+| `tests/stop_phase_test.c` e `tests/fixtures/slow_analyst.c` | Sincronizar `s` com criação, inicialização, fila cheia, atendimento e lote ativo do Analista; conferir TTY e recursos. |
 | `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
 
 ### Limites dos módulos
@@ -302,9 +304,11 @@ Na US12, o serviço fornece PID do filho, `completion_file` e `scheduler` ao `an
 
 ### Encerramento
 
-Na US17, `platform/terminal` salva flags e atributos de `stdin`, desativa modo canônico e eco apenas em TTY e ativa `O_NONBLOCK`. `terminal_poll` consome os bytes disponíveis, reconhece `s` e mantém EOF como condição persistente. `terminal_close` restaura ambos os estados, inclusive após inicialização parcial; a aplicação liga a condição ao serviço na US18.
+Na US17, `platform/terminal` salva flags e atributos de `stdin`, desativa modo canônico e eco apenas em TTY e ativa `O_NONBLOCK`. Desde a US25, `terminal_poll` lê no máximo 256 bytes por passagem e devolve `s` assim que aparece no bloco; EOF permanece persistente. Esse limite permite processar eventos de filhos e despachar rotinas com entrada continuamente pronta. `terminal_close` restaura flags e atributos, inclusive após inicialização parcial.
 
 Na US18, `service_process_events` lê a entrada antes de cada despacho. `processes_wait_input` aguarda `SIGCHLD` e entrada na mesma chamada de `pselect`; após `s`, deixa de monitorar o descritor. A Recepção pode abandonar um cliente `STARTING`, e o Atendente conclui o cliente já retomado antes de sair e solicita a drenagem. Fora dos contextos de usuário, o serviço cancela e recolhe a fila e o cliente em inicialização, executa os despertares solicitados e confirma o arquivo vazio. EOF sem `s` é erro. A CLI imprime satisfeitos/concluídos no modo infinito e taxa não aplicável quando não há conclusão.
+
+Na US25, a entrada contínua foi exercitada com 65.536 bytes antes de `s` e produtor ainda ativo depois dele. Testes de fases observam o processo cliente em inicialização, um marcador do atendimento ativo, 100 esperas pela contagem de filhos e um lote do Analista mantido ativo por fixture. A parada foi testada também em pseudoterminal sem Enter. O teste da Recepção confirma que a fila cheia volta a aceitar clientes ao liberar uma vaga em execução normal.
 
 Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINISHED`; falhas entram no caminho de limpeza com status de erro.
 

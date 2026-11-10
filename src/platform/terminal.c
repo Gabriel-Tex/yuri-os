@@ -52,23 +52,23 @@ bool terminal_poll(struct terminal_input *input, bool *stop_requested,
     *end_of_input = input->eof;
     if (input->eof) return true;
     char bytes[256];
-    for (;;) {
-        ssize_t count = read(input->descriptor, bytes, sizeof(bytes));
-        if (count > 0) {
-            for (ssize_t i = 0; i < count; i++) {
-                if (bytes[i] == 's') *stop_requested = true;
-            }
-            continue;
+    /* Um bloco por passagem permite processar filhos e despachar as rotinas
+     * mesmo quando a fonte de entrada permanece continuamente pronta. */
+    ssize_t count = read(input->descriptor, bytes, sizeof(bytes));
+    if (count > 0) {
+        for (ssize_t i = 0; i < count; i++) {
+            if (bytes[i] == 's') *stop_requested = true;
         }
-        if (count == 0) {
-            input->eof = true;
-            *end_of_input = true;
-            return true;
-        }
-        if (errno == EINTR) continue;
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return true;
-        return false;
+        return true;
     }
+    if (count == 0) {
+        input->eof = true;
+        *end_of_input = true;
+        return true;
+    }
+    if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+        return true;
+    return false;
 }
 
 bool terminal_close(struct terminal_input *input)

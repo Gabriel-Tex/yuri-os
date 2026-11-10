@@ -45,6 +45,11 @@ check_report
 check_report
 [[ $(awk '/^concluídos: / { print $2 }' "$test_dir/out") -gt 0 ]]
 
+{ head -c 65536 /dev/zero | tr '\0' x; printf s; yes x 2>/dev/null || :; } | \
+    timeout 20s "${client_env[@]}" "$service_path" 0 10000 \
+    >"$test_dir/out" 2>"$test_dir/err"
+check_report
+
 if timeout 20s "${client_env[@]}" \
     "$service_path" 0 10000 </dev/null >"$test_dir/out" \
     2>"$test_dir/err"; then

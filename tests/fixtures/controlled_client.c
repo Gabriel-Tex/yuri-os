@@ -39,8 +39,15 @@ int main(int argc, char **argv)
     if (argc == 1 || (argc == 2 &&
         (strcmp(argv[1], "service_late") == 0 ||
          strcmp(argv[1], "service_signal") == 0 ||
-         strcmp(argv[1], "service_hold") == 0)))
+         strcmp(argv[1], "service_hold") == 0 ||
+         strcmp(argv[1], "service_slow") == 0 ||
+         strcmp(argv[1], "startup_delay") == 0)))
     {
+        if (argc == 2 && strcmp(argv[1], "startup_delay") == 0)
+        {
+            struct timespec pause = {.tv_nsec = 400000000};
+            while (nanosleep(&pause, &pause) == -1 && errno == EINTR) {}
+        }
         FILE *file = fopen("demanda.txt", "w");
         if (file == NULL) return 20;
         int written = fputs("1000\n", file);
@@ -54,8 +61,16 @@ int main(int argc, char **argv)
         }
         if (argc == 2)
         {
-            struct timespec pause = {.tv_sec = 0, .tv_nsec = 30000000};
+            if (strcmp(argv[1], "service_slow") == 0)
+            {
+                FILE *marker = fopen("client.active", "w");
+                if (marker == NULL || fclose(marker) == EOF) return 26;
+            }
+            struct timespec pause = {.tv_sec = strcmp(argv[1], "service_slow") == 0 ? 2 : 0,
+                                     .tv_nsec = strcmp(argv[1], "service_slow") == 0 ? 0 : 30000000};
             while (nanosleep(&pause, &pause) == -1 && errno == EINTR) {}
+            if (strcmp(argv[1], "service_slow") == 0 &&
+                unlink("client.active") == -1) return 26;
         }
         sem_t *semaphore = sem_open("/sem_atend", 0);
         if (semaphore == SEM_FAILED) return 23;

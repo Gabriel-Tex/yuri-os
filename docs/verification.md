@@ -336,3 +336,16 @@ Em 2026-11-10, a Recepção passou a reconhecer saídas terminais de PIDs ainda 
 | `timeout -k 5s 90s make test-client` | Cliente da página 3 passou em N = 1, 11, 125 e infinito com `s`. |
 
 O SHA-256 de `provided/client.c` continuou `915feefbe60d63bb32fc1d348eefefadb740dfefff53211c0d3319b641f63ced`. Depois das suítes, os nomes `/sem_atend` e `/sem_block` estavam ausentes. A verificação de US24 não mede desempenho; as séries da US22 referem-se à revisão anterior e não são comparações de ganho.
+
+## US25 — Parada sob carga e em cada fase
+
+Em 2026-11-10, `terminal_poll` passou a ler no máximo 256 bytes por passagem. `terminal_test` verificou o deslocamento do arquivo após cada leitura e o reconhecimento de `s` no terceiro bloco. A CLI recebeu 65.536 bytes antes de `s` com um produtor contínuo depois dele e terminou com relatório coerente. `stop_phase_test` enviou `s` antes do primeiro cliente, durante a escrita atrasada da demanda, durante um atendimento de dois segundos, com 100 vagas ocupadas, durante um lote do Analista mantido ativo por fixture e em pseudoterminal sem Enter. O teste conferiu conclusão do atendimento em curso, cancelamento dos demais, ausência de filhos e semáforos, diretório removido e restauração de `termios`. `reception_test` continuou cobrindo a retomada da geração após abrir vaga na fila cheia.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout -k 5s 120s make test` | Passou com os testes de fase e a CLI de entrada contínua. |
+| `timeout -k 5s 120s make debug` | Passou com `-O0 -g3`. |
+| `timeout -k 5s 90s make test-client` | Passou com o cliente do enunciado nos modos finito e infinito. |
+| `timeout -k 3s 40s bash -c 'for iteration in 1 2 3; do ./build/stop_phase_test "$PWD/build/analyst" "$PWD/build/slow_analyst" "$PWD/build/controlled_client" >/dev/null || exit 1; done'` | Três repetições passaram; watchdog não disparou. |
+
+Os testes de fase usam o cliente e o Analista controlados para sincronizar a parada. A suíte da CLI confere PIDs impressos iguais às conclusões, denominador sem cancelados e taxa não aplicável com zero conclusões. Não foi feita comparação de desempenho.

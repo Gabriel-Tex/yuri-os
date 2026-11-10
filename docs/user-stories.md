@@ -518,7 +518,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 ## E08 — Conformidade e fechamento da primeira parte
 
-Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23 e US24 foram implementadas; US25–US27 permanecem abertas.
+Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23–US25 foram implementadas; US26–US27 permanecem abertas.
 
 ### US23 — Cumprir o protocolo de sincronização do diagrama
 
@@ -558,6 +558,8 @@ Resultado: cumprir o texto e o diagrama do professor e verificar a revisão fina
 **Verificação:** reproduzir sob watchdog a saída de um cliente já enfileirado e a chegada, numa coleta, de eventos do cliente ativo e de clientes sob responsabilidade da Recepção. Verificar também falha durante a inicialização e encerramento com `SIGTERM` originalmente bloqueado. Conferir status, `ECHILD`, semáforos, arquivos e estado do terminal.
 
 ### US25 — Garantir a parada por `s` sob carga e em cada fase
+
+**Estado:** implementada e verificada em 2026-11-10. Evidência em [verification.md](verification.md#us25--parada-sob-carga-e-em-cada-fase).
 
 **Tipo:** funcional · **Depende de:** US17–US18, US23–US24 · **Cobre:** R03, R08–R12, R15.
 

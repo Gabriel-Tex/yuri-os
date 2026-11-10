@@ -4,7 +4,7 @@ Este repositório implementa os modos finito e infinito da primeira parte do tra
 
 A Recepção cria os dois semáforos antes do Analista e dos clientes. O Atendente confirma saída zero e disponibilidade de `/sem_atend` antes de registrar uma conclusão; seus pedidos de despertar também conduzem a drenagem do arquivo de PIDs.
 
-A entrega ainda tem pendências para entrada contínua, valores extremos de X e revisão final. [Pendências e critérios de fechamento](docs/user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
+A entrega ainda tem pendências para valores extremos de X e revisão final. [Pendências e critérios de fechamento](docs/user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
 
 No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 
