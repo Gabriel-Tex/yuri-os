@@ -1,8 +1,7 @@
 #include "client.h"
 
+#include <errno.h>
 #include <stddef.h>
-
-#define CLIENT_NS_PER_MS UINT64_C(1000000)
 
 bool client_init(struct client_record *client, pid_t pid, uint64_t sequence,
                  enum client_priority priority, uint64_t arrival_ns,
@@ -10,8 +9,9 @@ bool client_init(struct client_record *client, pid_t pid, uint64_t sequence,
 {
     if (client == NULL || pid <= 0 || max_patience_ms == 0 ||
         (priority != CLIENT_PRIORITY_HIGH && priority != CLIENT_PRIORITY_LOW) ||
-        max_patience_ms > UINT64_MAX / CLIENT_NS_PER_MS)
+        max_patience_ms > CLIENT_MAX_PATIENCE_MS)
     {
+        errno = EINVAL;
         return false;
     }
 
@@ -21,11 +21,6 @@ bool client_init(struct client_record *client, pid_t pid, uint64_t sequence,
     {
         patience_ns /= 2;
     }
-    if (arrival_ns > UINT64_MAX - patience_ns)
-    {
-        return false;
-    }
-
     *client = (struct client_record){
         .pid = pid,
         .sequence = sequence,
@@ -33,6 +28,7 @@ bool client_init(struct client_record *client, pid_t pid, uint64_t sequence,
         .arrival_ns = arrival_ns,
         .patience_ns = patience_ns,
         .deadline_ns = arrival_ns + patience_ns,
+        .deadline_carry = arrival_ns > UINT64_MAX - patience_ns,
         .demand_us = 0,
         .state = CLIENT_STARTING,
         .completion_ns = 0};

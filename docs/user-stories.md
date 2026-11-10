@@ -518,7 +518,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 ## E08 — Conformidade e fechamento da primeira parte
 
-Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23–US25 foram implementadas; US26–US27 permanecem abertas.
+Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23–US26 foram implementadas; US27 permanece aberta.
 
 ### US23 — Cumprir o protocolo de sincronização do diagrama
 
@@ -576,6 +576,8 @@ Resultado: cumprir o texto e o diagrama do professor e verificar a revisão fina
 **Verificação:** sincronizar os testes por estado observável, com `s` antes da primeira criação, durante a inicialização de um cliente, com 100 em espera, durante atendimento e durante um lote do Analista. Usar pipe com produtor contínuo e pseudoterminal. Demonstrar também que a fila cheia volta a admitir clientes quando abre vaga durante a execução normal.
 
 ### US26 — Alinhar os limites de X e a origem da medição
+
+**Estado:** implementada e verificada em 2026-11-10. Evidência em [verification.md](verification.md#us26--limites-de-x-e-origem-da-medição).
 
 **Tipo:** funcional · **Depende de:** US01, US03, US13, US21 · **Cobre:** R03, R05–R07, R13, R18 · **Decisões afetadas:** D11, D13.
 

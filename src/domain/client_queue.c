@@ -78,8 +78,11 @@ bool client_queue_take_next(struct client_queue *queue,
     {
         const struct client_record *candidate = &queue->records[i];
         const struct client_record *selected = &queue->records[best];
-        if (candidate->deadline_ns < selected->deadline_ns ||
-            (candidate->deadline_ns == selected->deadline_ns &&
+        if ((!candidate->deadline_carry && selected->deadline_carry) ||
+            (candidate->deadline_carry == selected->deadline_carry &&
+             candidate->deadline_ns < selected->deadline_ns) ||
+            (candidate->deadline_carry == selected->deadline_carry &&
+             candidate->deadline_ns == selected->deadline_ns &&
              candidate->sequence < selected->sequence))
         {
             best = i;

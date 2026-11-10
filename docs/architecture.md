@@ -53,9 +53,9 @@ A página 3 do PDF contém a listagem confirmada para a entrega. Sua transcriç�
 | D08 | Ao receber s, concluir o atendimento atual, cancelar os demais e drenar os PIDs. | Definir um encerramento verificável e o denominador da taxa. |
 | D09 | Dados em `run/<execution-id>/` e somente uma instância ativa. | Isolar arquivos locais enquanto o cliente usa semáforo de nome global. |
 | D10 | Consumir a demanda decimal de um cliente parado antes de criar o próximo. | Impedir associação cruzada no arquivo compartilhado e conservar o dado original do cliente. |
-| D11 | Tempo monotônico em nanossegundos; conclusão no instante observado pelo pai. | Preservar X/2 quando X for ímpar e evitar saltos do relógio civil. |
+| D11 | Origem monotônica na entrada da CLI; prazo absoluto com bit de transporte e conclusão no instante observado pelo pai. | Preservar X/2 quando X for ímpar, ordenar prazos além de `UINT64_MAX` e evitar saltos do relógio civil. |
 | D12 | Despertar o Analista com dez PIDs, na ociosidade com pendências ou na drenagem. | Escoar o arquivo sem exigir impressão após cada atendimento. |
-| D13 | Aceitar N inteiro não negativo e X inteiro positivo em ms; rejeitar conversão com overflow. | Definir uma CLI sem cálculos inválidos; rejeitar X = 0 é decisão de validação. |
+| D13 | Aceitar N inteiro não negativo e X entre 1 e `CLIENT_MAX_PATIENCE_MS` em ms; rejeitar conversão com overflow. | Compartilhar o limite da CLI e do domínio; rejeitar X = 0 é decisão de validação. |
 
 O limite de 100 no modo finito, EDF, C17 e a drenagem finita são decisões do projeto. O enunciado não exige essas escolhas específicas. EDF seleciona pelo prazo, mas não garante satisfação ótima em toda carga.
 
@@ -182,7 +182,7 @@ O domínio não faz I/O nem lê o relógio real. O runtime não conhece clientes
 
 | Contrato | Dados e responsabilidade |
 |---|---|
-| Configuração | N, X e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
+| Configuração | N, X, origem monotônica opcional para chamadas diretas e caminhos dos executáveis resolvidos antes de mudar o diretório de trabalho; CLI `service N X`. |
 | Cliente | PID, sequência, prioridade, chegada, paciência, prazo absoluto, demanda, estado e conclusão quando houver. |
 | Fila | Possui até 100 clientes `QUEUED` ou 99 mais uma reserva `STARTING`; a retirada transfere o registro ao Atendente. Inserção inválida não descarta o cliente. |
 | Métricas | Criados, concluídos, satisfeitos, cancelados e falhos; as operações terminais mudam estado e contadores juntas, uma vez por registro. |
@@ -194,9 +194,9 @@ O runtime oferece `scheduler_run` para rotinas que apenas cedem e `scheduler_run
 
 ### Registro do cliente — US01
 
-`struct client_record`, em `domain/client.h`, é um registro por valor, sem alocação ou recurso próprio. PID usa `pid_t`; sequência, demanda e tempos usam `uint64_t`. Chegada, paciência, prazo absoluto e conclusão estão em nanossegundos; demanda está em microssegundos. A aplicação fornece chegada relativa ao início da execução no momento da criação; nenhuma transição a altera.
+`struct client_record`, em `domain/client.h`, é um registro por valor, sem alocação ou recurso próprio. PID usa `pid_t`; sequência, demanda e instantes usam `uint64_t`. Chegada, paciência, prazo absoluto e conclusão estão em nanossegundos; demanda está em microssegundos. O prazo usa `deadline_carry` e `deadline_ns` para representar a soma exata de chegada e paciência além de `UINT64_MAX`. A aplicação fornece chegada relativa ao início do programa junto ao `fork`; nenhuma transição a altera.
 
-`client_init` exige PID positivo, prioridade válida e X positivo em milissegundos. Primeiro converte X para nanossegundos, depois divide por dois para prioridade alta e soma a chegada. Recusa conversão ou soma que ultrapasse `UINT64_MAX`, mantendo o destino intacto. O maior X aceito é `UINT64_MAX / 1000000` ms (18.446.744.073.709 ms); a chegada ainda precisa permitir a soma. Sequência zero é válida; unicidade e ordem são responsabilidade da aplicação.
+`client_init` exige PID positivo, prioridade válida e X positivo em milissegundos. Primeiro converte X para nanossegundos, depois divide por dois para prioridade alta e soma a chegada com bit de transporte. Recusa X acima de `CLIENT_MAX_PATIENCE_MS = UINT64_MAX / 1000000` ms (18.446.744.073.709 ms), mantendo o destino intacto. Toda chegada representável em `uint64_t` produz um prazo válido para X aceito. Sequência zero é válida; unicidade e ordem são responsabilidade da aplicação.
 
 | Operação | Transição | Contrato e propriedade |
 |---|---|---|
@@ -217,7 +217,7 @@ A demanda só é válida após `client_enqueue`; zero e todo o intervalo de `uin
 
 `client_queue_waiting_count` inclui registros enfileirados e a reserva. `client_queue_has_space` indica se uma nova reserva é possível; com 100 esperas, a Recepção deve aguardar um evento de vaga do runtime (US06/US14). Uma tentativa de reserva cheia ou inserção inválida retorna `false` sem alterar a fila nem o registro do chamador. A aplicação é responsável por não manter outra cópia ativa após inserir e por notificar o Atendente sobre a disponibilidade de cliente.
 
-`client_queue_take_next` copia para o destino externo o registro com menor `deadline_ns`; em empate, usa menor `sequence`. A aplicação atribui sequências únicas, portanto não há contrato de ordem para sequências iguais. A retirada libera a vaga antes de o Atendente marcar o registro `IN_SERVICE`; a aplicação deve notificar a Recepção. Um prazo já vencido não retira o cliente da seleção. A busca e a remoção percorrem no máximo 100 entradas, e a remoção preenche o buraco com o último elemento. Esse vetor não consulta relógio, processos ou sinais.
+`client_queue_take_next` copia para o destino externo o registro com menor par (`deadline_carry`, `deadline_ns`); em empate, usa menor `sequence`. A aplicação atribui sequências únicas, portanto não há contrato de ordem para sequências iguais. A retirada libera a vaga antes de o Atendente marcar o registro `IN_SERVICE`; a aplicação deve notificar a Recepção. Um prazo já vencido não retira o cliente da seleção. A busca e a remoção percorrem no máximo 100 entradas, e a remoção preenche o buraco com o último elemento. Esse vetor não consulta relógio, processos ou sinais.
 
 ## Execução e sincronização
 
@@ -249,12 +249,12 @@ Na US08, `demand_init` abre o diretório absoluto da execução. `demand_begin` 
 
 Na US09, o IPC mantém um lock com `flock` em `/tmp/service-simulator-<uid>.lock` durante a execução. O inode permanece após o fechamento para impedir que duas instâncias bloqueiem arquivos diferentes. `service_prepare` adquire somente esse lock. A Recepção cria `/sem_atend` e `/sem_block` com `O_CREAT | O_EXCL`, valor inicial 1 e posse registrada, antes de iniciar o Analista ou criar clientes. Recurso já existente causa erro sem remoção. `ipc_service_close` fecha handles, remove apenas os nomes criados por esta instância e aceita repetição ou falha parcial. A tentativa `ipc_try_acquire` devolve ocupado sem bloquear em `EAGAIN`. Clientes e Analista podem abrir os nomes existentes sem adquirir sua propriedade.
 
-Na US13, `service_main` aceita apenas dígitos decimais para N e X, rejeita sinais, sufixos e overflow, e limita X ao maior valor conversível para nanossegundos. O caminho absoluto do executável identifica o projeto e o `analyst` irmão, independentemente do diretório corrente ou de espaços no caminho. `service_prepare` inicia o relógio, adquire o lock de instância, cria `run/execution-XXXXXX` e prepara o escalonador. A Recepção cria os semáforos, abre `completed.log`, cria o Analista e espera sua parada inicial por evento antes do primeiro cliente. `service_process_events` é o único consumidor de `waitpid` e encaminha eventos de cliente ao fluxo responsável. A CLI usa as duas rotinas reais nos modos finito e infinito.
+Na US13, `service_main` aceita apenas dígitos decimais para N e X, rejeita sinais, sufixos e overflow, e limita X ao maior valor conversível para nanossegundos. A CLI captura a origem monotônica ao entrar em `main`, antes de validar N/X ou resolver os caminhos. O caminho absoluto do executável identifica o projeto e o `analyst` irmão, independentemente do diretório corrente ou de espaços no caminho. `service_prepare` usa a origem fornecida ou captura uma para chamadas diretas, adquire o lock de instância, cria `run/execution-XXXXXX` e prepara o escalonador. A Recepção cria os semáforos, abre `completed.log`, cria o Analista e espera sua parada inicial por evento antes do primeiro cliente. `service_process_events` é o único consumidor de `waitpid` e encaminha eventos de cliente ao fluxo responsável.
 
 ### Inicialização
 
-1. Validar N/X e resolver os caminhos dos executáveis.
-2. Iniciar a medição; adquirir o bloqueio de instância e criar `run/<execution-id>/`.
+1. Capturar a origem monotônica; validar N/X e resolver os caminhos dos executáveis.
+2. Adquirir o bloqueio de instância e criar `run/<execution-id>/`.
 3. Criar os semáforos inicialmente disponíveis e `completed.log` vazio.
 4. Criar o Analista. Ele escreve `analyst.pid` e para com `SIGSTOP`; o pai observa essa parada antes de despertá-lo.
 5. Preparar entrada, eventos e as duas threads; iniciar a geração.
@@ -323,9 +323,9 @@ Na US19, `platform/interrupt` bloqueia `SIGINT` e `SIGTERM` fora da espera e os 
 
 ## Tempo, métricas e cliente de referência
 
-Guardar instantes monotônicos em nanossegundos. Converter X ms antes de dividir por dois, preservando, por exemplo, 2,5 ms quando X = 5. Verificar overflow em conversões e somas.
+Guardar instantes monotônicos em nanossegundos. Converter X ms antes de dividir por dois, preservando, por exemplo, 2,5 ms quando X = 5. Verificar overflow na conversão; a soma do prazo conserva o bit de transporte.
 
-`platform/clock` lê `CLOCK_MONOTONIC` e converte `timespec` para nanossegundos com validação de segundos, fração e overflow. O cálculo puro de duração exige fim maior ou igual ao início; o tempo total será obtido pela aplicação ao final da limpeza. O domínio recebe apenas instantes numéricos e não consulta o relógio. Falhas de conversão ou leitura preservam a saída e permitem ao chamador examinar `errno`.
+`platform/clock` lê `CLOCK_MONOTONIC` e converte `timespec` para nanossegundos com validação de segundos, fração e overflow. O cálculo puro de duração exige fim maior ou igual ao início. `service_close` mede após liberar os recursos do serviço; a CLI atualiza a duração após liberar também os caminhos alocados, antes do relatório. O domínio recebe apenas instantes numéricos e não consulta o relógio. Falhas de conversão ou leitura preservam a saída e permitem ao chamador examinar `errno`.
 
 `metrics_record_created` incrementa criados após cada `fork` bem-sucedido. Para cada registro ativo, a aplicação usa uma das operações `metrics_record_completed`, `metrics_record_cancelled` ou `metrics_record_failed`; elas fazem a transição da US01 e incrementam o contador correspondente sem ceder execução. Não chamar separadamente `client_complete`, `client_cancel` ou `client_fail` para o mesmo evento. As operações recusam estado inválido, ausência de cliente criado ainda sem evento terminal e overflow, preservando registro e contadores. O chamador fornece a conclusão observada após confirmar a saída normal do processo; nenhuma demanda estimada substitui esse instante.
 
@@ -338,7 +338,7 @@ A resposta usa subtração sem sinal `conclusão - chegada` somente depois de co
 | Taxa finita | Satisfeitos/N após sucesso com N concluídos. |
 | Taxa infinita | Satisfeitos/concluídos; cancelar clientes não aumenta o denominador. |
 | Zero concluídos | Taxa não aplicável, com contador zero; sem divisão por zero. |
-| Tempo total | Da inicialização antes dos recursos/filhos até o fim da drenagem e limpeza, imediatamente antes do relatório. |
+| Tempo total | Da entrada da CLI, antes de validar argumentos, até o fim da drenagem e limpeza, imediatamente antes do relatório. |
 
 O cliente da página 3 do PDF determina estes pontos de integração:
 

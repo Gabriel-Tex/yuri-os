@@ -31,8 +31,13 @@ int main(int argc, char **argv)
                                     .max_patience_ms = 5,
                                     .project_root = root,
                                     .analyst_path = argv[1]};
+    uint64_t now_ns;
+    CHECK(clock_monotonic_ns(&now_ns) && now_ns > UINT64_C(1000000000));
+    config.execution_start_ns = now_ns - UINT64_C(1000000000);
+    config.execution_start_supplied = true;
     struct service_state service = {0};
     CHECK(service_prepare(&service, &config));
+    CHECK(service.start_ns == config.execution_start_ns);
     CHECK(ipc_service_create_semaphores(&service.ipc));
     CHECK(service_start_analyst(&service));
     while (!service_analyst_ready(&service)) {
@@ -53,8 +58,14 @@ int main(int argc, char **argv)
     CHECK(reception_steps == 2 && attendant_steps == 2);
     struct service_result result = {0};
     CHECK(service_close(&service, &result));
-    CHECK(result.prepared && !result.complete && result.elapsed_ns > 0);
+    CHECK(result.prepared && !result.complete &&
+          result.elapsed_ns >= UINT64_C(1000000000));
     CHECK(service_close(&service, NULL));
+
+    config.execution_start_ns = UINT64_MAX;
+    CHECK(!service_prepare(&service, &config) && errno == EINVAL);
+    CHECK(service.run_directory == NULL);
+    config.execution_start_ns = now_ns - UINT64_C(1000000000);
     int child_status;
     CHECK(waitpid(-1, &child_status, WNOHANG) == -1 && errno == ECHILD);
 

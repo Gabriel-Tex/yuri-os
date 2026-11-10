@@ -157,12 +157,38 @@ static void test_invalid_operations(void)
     CHECK(result.pid == 1);
 }
 
+static void test_deadline_carry_order(void)
+{
+    struct client_queue queue;
+    struct client_record result;
+    CHECK(client_queue_init(&queue));
+    const uint64_t arrival = UINT64_MAX - UINT64_C(600000);
+    struct client_record low;
+    struct client_record high;
+    struct client_record earlier;
+    CHECK(client_init(&low, 1, 1, CLIENT_PRIORITY_LOW, arrival, 3));
+    CHECK(client_init(&high, 2, 2, CLIENT_PRIORITY_HIGH, arrival, 3));
+    CHECK(client_init(&earlier, 3, 3, CLIENT_PRIORITY_HIGH,
+                      arrival - UINT64_C(2000000), 3));
+    CHECK(low.deadline_carry && high.deadline_carry &&
+          !earlier.deadline_carry);
+    CHECK(client_enqueue(&low, 1) && client_enqueue(&high, 1) &&
+          client_enqueue(&earlier, 1));
+    CHECK(client_queue_reserve(&queue) && client_queue_insert(&queue, &low));
+    CHECK(client_queue_reserve(&queue) && client_queue_insert(&queue, &high));
+    CHECK(client_queue_reserve(&queue) && client_queue_insert(&queue, &earlier));
+    CHECK(client_queue_take_next(&queue, &result) && result.pid == 3);
+    CHECK(client_queue_take_next(&queue, &result) && result.pid == 2);
+    CHECK(client_queue_take_next(&queue, &result) && result.pid == 1);
+}
+
 int main(void)
 {
     test_empty_and_single();
     test_capacity_and_reuse();
     test_order_and_expired_deadline();
     test_invalid_operations();
-    puts("Fila: 4 grupos de testes passaram (US02).");
+    test_deadline_carry_order();
+    puts("Fila: 5 grupos de testes passaram (US02, US26).");
     return EXIT_SUCCESS;
 }

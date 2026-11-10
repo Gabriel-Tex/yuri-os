@@ -349,3 +349,18 @@ Em 2026-11-10, `terminal_poll` passou a ler no máximo 256 bytes por passagem. `
 | `timeout -k 3s 40s bash -c 'for iteration in 1 2 3; do ./build/stop_phase_test "$PWD/build/analyst" "$PWD/build/slow_analyst" "$PWD/build/controlled_client" >/dev/null || exit 1; done'` | Três repetições passaram; watchdog não disparou. |
 
 Os testes de fase usam o cliente e o Analista controlados para sincronizar a parada. A suíte da CLI confere PIDs impressos iguais às conclusões, denominador sem cancelados e taxa não aplicável com zero conclusões. Não foi feita comparação de desempenho.
+
+## US26 — Limites de X e origem da medição
+
+Em 2026-11-10, CLI e domínio passaram a usar `CLIENT_MAX_PATIENCE_MS = 18.446.744.073.709` ms. O prazo absoluto usa um bit de transporte e a parte baixa em nanossegundos; assim, toda chegada representável produz prazo válido para X aceito. `domain_test` exercitou os dois tipos de prioridade com X máximo, X ímpar, soma exata em `UINT64_MAX` e transporte com chegada um nanossegundo maior. `client_queue_test` verificou a ordem EDF entre prazos antes e depois desse limite. Os testes de métricas continuam cobrindo resposta igual à paciência e um nanossegundo acima.
+
+`service_cli_test.sh` executou N = 1 com o maior X suportado e recusou o primeiro valor acima dele, `18.446.744.073.710`, com diagnóstico de faixa. `service_test` forneceu uma origem um segundo antes da preparação, confirmou sua preservação e duração final de pelo menos um segundo; também recusou origem futura antes de criar recursos. A inspeção de `service_main.c` confirmou que a amostra inicial ocorre antes da validação e da resolução de caminhos. A CLI calcula a duração final depois de `service_close` e de liberar os caminhos alocados. A chegada continua sendo amostrada junto à criação, antes do `fork`, e a conclusão na saída zero observada.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout -k 5s 120s make test` | Passou, incluindo X máximo e primeiro rejeitado pela CLI. |
+| `timeout -k 5s 120s make debug` | Passou com `-O0 -g3`. |
+| `timeout -k 5s 90s make test-client` | Passou com o cliente do enunciado nos modos finito e infinito. |
+| `timeout -k 3s 30s bash -c 'for iteration in {1..10}; do SERVICE_CLIENT_PATH="$PWD/build/controlled_client" ./build/service 1 18446744073709 >/dev/null || exit 1; done'` | Dez execuções com X máximo passaram, sem diretórios de execução remanescentes. |
+
+O cliente fornecido permaneceu sem alteração. Estes testes comprovam correção e compatibilidade nas condições executadas; não constituem medição comparativa de satisfação ou tempo.

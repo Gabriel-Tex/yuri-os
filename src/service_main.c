@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "app/service.h"
+#include "domain/client.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -9,8 +10,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#define SERVICE_X_MAX_MS (UINT64_MAX / UINT64_C(1000000))
 
 static bool service_parse_integer(const char *text, bool allow_zero,
                                   uint64_t maximum, uint64_t *value)
@@ -108,13 +107,23 @@ static char *service_find_client(const char *analyst)
 
 int main(int argc, char **argv)
 {
+    uint64_t execution_start_ns;
+    if (!clock_monotonic_ns(&execution_start_ns)) {
+        perror("service: relógio inicial");
+        return EXIT_FAILURE;
+    }
     uint64_t count;
     uint64_t patience_ms;
     if (argc != 3 || !service_parse_integer(argv[1], true, UINT64_MAX,
-                                             &count) ||
-        !service_parse_integer(argv[2], false, SERVICE_X_MAX_MS,
-                               &patience_ms)) {
+                                             &count)) {
         fprintf(stderr, "uso: service N X (N >= 0, X > 0 em ms)\n");
+        return EXIT_FAILURE;
+    }
+    if (!service_parse_integer(argv[2], false, CLIENT_MAX_PATIENCE_MS,
+                               &patience_ms)) {
+        fprintf(stderr, "uso: service N X (N >= 0, X > 0 em ms)\n"
+                "X deve ser inteiro entre 1 e %" PRIu64 " ms\n",
+                CLIENT_MAX_PATIENCE_MS);
         return EXIT_FAILURE;
     }
     char *root = NULL;
@@ -126,7 +135,9 @@ int main(int argc, char **argv)
     struct service_config config = {.client_count = count,
                                     .max_patience_ms = patience_ms,
                                     .project_root = root,
-                                    .analyst_path = analyst};
+                                    .analyst_path = analyst,
+                                    .execution_start_ns = execution_start_ns,
+                                    .execution_start_supplied = true};
     char *client_path = service_find_client(analyst);
     if (client_path == NULL || access(client_path, X_OK) == -1) {
         int error = errno;
@@ -152,7 +163,12 @@ int main(int argc, char **argv)
     free(client_path);
     free(root);
     free(analyst);
-    if (!prepared || !ran || !closed || !result.complete) {
+    uint64_t end_ns;
+    bool measured = clock_monotonic_ns(&end_ns) &&
+                    clock_elapsed_ns(execution_start_ns, end_ns,
+                                     &result.elapsed_ns);
+    if (!measured && error == 0) error = errno;
+    if (!prepared || !ran || !closed || !result.complete || !measured) {
         errno = error != 0 ? error : EPROTO;
         perror(count > 0 ? "service: execução finita" :
                            "service: execução infinita");

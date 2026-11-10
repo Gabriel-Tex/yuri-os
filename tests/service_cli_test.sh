@@ -16,6 +16,16 @@ for arguments in "${invalid[@]}"; do
         exit 1
     fi
 done
+if (cd /tmp && "$sandbox_dir/service" 1 18446744073710 >"$sandbox_dir/out" 2>"$sandbox_dir/err"); then
+    echo 'X fora da faixa aceito' >&2
+    exit 1
+fi
+grep -q '^X deve ser inteiro entre 1 e 18446744073709 ms$' "$sandbox_dir/err"
+controlled_path=${service_path%/*}/controlled_client
+(cd /tmp && SERVICE_CLIENT_PATH="$controlled_path" \
+    "$sandbox_dir/service" 1 18446744073709 >"$sandbox_dir/out" 2>"$sandbox_dir/err")
+[[ ! -s "$sandbox_dir/err" ]]
+grep -q '^concluídos: 1$' "$sandbox_dir/out"
 set +e
 (cd /tmp && SERVICE_CLIENT_PATH=/tmp/cliente-inexistente-us16 "$sandbox_dir/service" 1 5 >"$sandbox_dir/out" 2>"$sandbox_dir/err")
 status=$?

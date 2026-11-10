@@ -30,6 +30,7 @@ static void check_equal(const struct client_record *actual,
     CHECK(actual->arrival_ns == expected->arrival_ns);
     CHECK(actual->patience_ns == expected->patience_ns);
     CHECK(actual->deadline_ns == expected->deadline_ns);
+    CHECK(actual->deadline_carry == expected->deadline_carry);
     CHECK(actual->demand_us == expected->demand_us);
     CHECK(actual->state == expected->state);
     CHECK(actual->completion_ns == expected->completion_ns);
@@ -59,6 +60,7 @@ static void test_priorities_and_units(void)
         CHECK(low.patience_ns == cases[i].low_ns);
         CHECK(high.deadline_ns == 17 + cases[i].high_ns);
         CHECK(low.deadline_ns == 17 + cases[i].low_ns);
+        CHECK(!high.deadline_carry && !low.deadline_carry);
         CHECK(high.priority == CLIENT_PRIORITY_HIGH);
         CHECK(low.priority == CLIENT_PRIORITY_LOW);
         CHECK(high.sequence == 0);
@@ -103,11 +105,12 @@ static void test_initialization_limits(void)
         CHECK(client_init(&boundary, 123, 7, priorities[i], last_arrival_ns,
                           max_ms));
         CHECK(boundary.deadline_ns == UINT64_MAX);
-        CHECK(!client_init(&client, 123, 7, priorities[i], last_arrival_ns + 1,
-                           max_ms));
-        check_equal(&client, &original);
-        CHECK(!client_init(&client, 123, 7, priorities[i], UINT64_MAX, 1));
-        check_equal(&client, &original);
+        CHECK(!boundary.deadline_carry);
+        CHECK(client_init(&boundary, 123, 7, priorities[i],
+                          last_arrival_ns + 1, max_ms));
+        CHECK(boundary.deadline_carry && boundary.deadline_ns == 0);
+        CHECK(client_init(&boundary, 123, 7, priorities[i], UINT64_MAX, 1));
+        CHECK(boundary.deadline_carry);
     }
 }
 

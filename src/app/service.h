@@ -19,6 +19,8 @@ struct service_config {
     uint64_t max_patience_ms;
     const char *project_root;
     const char *analyst_path;
+    uint64_t execution_start_ns;
+    bool execution_start_supplied;
 };
 
 struct service_result {

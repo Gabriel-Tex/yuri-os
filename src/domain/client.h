@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#define CLIENT_NS_PER_MS UINT64_C(1000000)
+#define CLIENT_MAX_PATIENCE_MS (UINT64_MAX / CLIENT_NS_PER_MS)
+
 enum client_priority
 {
     CLIENT_PRIORITY_HIGH,
@@ -32,14 +35,15 @@ struct client_record
     uint64_t arrival_ns;
     uint64_t patience_ns;
     uint64_t deadline_ns;
+    bool deadline_carry;
     uint64_t demand_us;
     enum client_state state;
     uint64_t completion_ns;
 };
 
 /* Inicializa armazenamento sem proprietário ativo. PID e X devem ser positivos;
- * sequência e instantes são fornecidos pelo chamador. Qualquer recusa mantém
- * o registro intacto, inclusive em overflow da conversão ou do prazo. */
+ * sequência e instantes são fornecidos pelo chamador. O prazo soma chegada e
+ * paciência com um bit de transporte; X acima do limite é recusado. */
 bool client_init(struct client_record *client, pid_t pid, uint64_t sequence,
                  enum client_priority priority, uint64_t arrival_ns,
                  uint64_t max_patience_ms);

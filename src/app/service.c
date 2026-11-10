@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include "service.h"
 #include "workers.h"
+#include "domain/client.h"
 
 #include <errno.h>
 #include <dirent.h>
@@ -197,13 +198,21 @@ bool service_prepare(struct service_state *service,
         config->project_root == NULL || config->project_root[0] != '/' ||
         config->analyst_path == NULL || config->analyst_path[0] != '/' ||
         config->max_patience_ms == 0 ||
-        config->max_patience_ms > UINT64_MAX / UINT64_C(1000000)) {
+        config->max_patience_ms > CLIENT_MAX_PATIENCE_MS) {
         errno = EINVAL;
         return false;
     }
     service->config = *config;
-    if (!clock_monotonic_ns(&service->start_ns) ||
-        !processes_watcher_init(&service->watcher) ||
+    uint64_t now_ns;
+    if (!clock_monotonic_ns(&now_ns)) return false;
+    if (config->execution_start_supplied &&
+        config->execution_start_ns > now_ns) {
+        errno = EINVAL;
+        return false;
+    }
+    service->start_ns = config->execution_start_supplied ?
+                        config->execution_start_ns : now_ns;
+    if (!processes_watcher_init(&service->watcher) ||
         !interrupt_init(&service->interruption) ||
         !ipc_service_lock_init(&service->ipc) ||
         !service_make_directory(service, config->project_root) ||
