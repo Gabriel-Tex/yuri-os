@@ -8,12 +8,66 @@
 
 struct workers_cleanup_state {
     struct service_state *service;
+    struct workers_reception *reception;
+    struct workers_attendant *attendant;
     pid_t pids[CLIENT_QUEUE_CAPACITY + 1];
     bool reaped[CLIENT_QUEUE_CAPACITY + 1];
     size_t count;
     size_t remaining;
     int error;
 };
+
+static bool workers_terminal(const struct processes_event *event)
+{
+    return event->kind == PROCESSES_EXITED_OK ||
+           event->kind == PROCESSES_EXITED_ERROR ||
+           event->kind == PROCESSES_SIGNALED;
+}
+
+static bool workers_queued_contains(const struct workers_reception *reception,
+                                     pid_t pid)
+{
+    for (size_t i = 0; reception->queue != NULL &&
+                       i < reception->queue->count; i++) {
+        if (reception->queue->records[i].pid == pid) return true;
+    }
+    return false;
+}
+
+static bool workers_queued_reaped(const struct workers_reception *reception,
+                                   pid_t pid)
+{
+    for (size_t i = 0; i < reception->reaped_queued_count; i++) {
+        if (reception->reaped_queued[i] == pid) return true;
+    }
+    return false;
+}
+
+static bool workers_mark_queued_reaped(struct workers_reception *reception,
+                                       pid_t pid)
+{
+    if (workers_queued_reaped(reception, pid)) return true;
+    if (reception->reaped_queued_count == CLIENT_QUEUE_CAPACITY) {
+        errno = EOVERFLOW;
+        return false;
+    }
+    reception->reaped_queued[reception->reaped_queued_count++] = pid;
+    return true;
+}
+
+static bool workers_mark_queued_failed(struct workers_reception *reception,
+                                       pid_t pid)
+{
+    for (size_t i = 0; i < reception->failed_queued_count; i++) {
+        if (reception->failed_queued[i] == pid) return true;
+    }
+    if (reception->failed_queued_count == CLIENT_QUEUE_CAPACITY) {
+        errno = EOVERFLOW;
+        return false;
+    }
+    reception->failed_queued[reception->failed_queued_count++] = pid;
+    return true;
+}
 
 static void workers_cleanup_event(void *context,
                                    const struct processes_event *event)
@@ -29,16 +83,42 @@ static void workers_cleanup_event(void *context,
             cleanup->error = errno;
         return;
     }
-    if (event->kind != PROCESSES_EXITED_OK &&
-        event->kind != PROCESSES_EXITED_ERROR &&
-        event->kind != PROCESSES_SIGNALED) return;
+    if (!workers_terminal(event)) return;
+    size_t target = cleanup->count;
     for (size_t i = 0; i < cleanup->count; i++) {
-        if (cleanup->pids[i] == event->pid && !cleanup->reaped[i]) {
-            cleanup->reaped[i] = true;
-            cleanup->remaining--;
-            return;
+        if (cleanup->pids[i] == event->pid) {
+            target = i;
+            break;
         }
     }
+    bool owned = false;
+    if (cleanup->reception != NULL) {
+        struct workers_reception *reception = cleanup->reception;
+        if (reception->starting_active &&
+            reception->starting.pid == event->pid) {
+            reception->starting_reaped = true;
+            if (target == cleanup->count) reception->starting_failed = true;
+            owned = true;
+        } else if (workers_queued_contains(reception, event->pid)) {
+            if (!workers_mark_queued_reaped(reception, event->pid) &&
+                cleanup->error == 0) cleanup->error = errno;
+            if (target == cleanup->count &&
+                !workers_mark_queued_failed(reception, event->pid) &&
+                cleanup->error == 0) cleanup->error = errno;
+            owned = true;
+        }
+    }
+    if (cleanup->attendant != NULL && cleanup->attendant->active_valid &&
+        cleanup->attendant->active.pid == event->pid) {
+        cleanup->attendant->active_reaped = true;
+        owned = true;
+    }
+    if (target < cleanup->count && !cleanup->reaped[target]) {
+        cleanup->reaped[target] = true;
+        cleanup->remaining--;
+        return;
+    }
+    if (!owned && cleanup->error == 0) cleanup->error = EPROTO;
 }
 
 static bool workers_should_stop(void *context)
@@ -128,15 +208,26 @@ void workers_reception_on_event(void *context,
     struct workers_reception *reception = context;
     if (reception->starting_active && event->pid == reception->starting.pid) {
         if (!demand_observe(&reception->demand, event)) {
-            if (event->kind == PROCESSES_EXITED_OK ||
-                event->kind == PROCESSES_EXITED_ERROR ||
-                event->kind == PROCESSES_SIGNALED) {
+            if (workers_terminal(event)) {
                 reception->starting_reaped = true;
+                reception->starting_failed = true;
             }
             workers_fail(reception, errno);
         } else if (reception->demand.stopped) {
             scheduler_notify(&reception->service->scheduler,
                              WORKERS_START_EVENT);
+        }
+        return;
+    }
+    if (workers_queued_contains(reception, event->pid)) {
+        if (workers_terminal(event) &&
+            (!workers_mark_queued_reaped(reception, event->pid) ||
+             !workers_mark_queued_failed(reception, event->pid))) {
+            workers_fail(reception, errno);
+        } else if (workers_terminal(event)) {
+            workers_fail(reception, ECHILD);
+        } else if (event->kind != PROCESSES_STOPPED) {
+            workers_fail(reception, EPROTO);
         }
         return;
     }
@@ -239,13 +330,16 @@ bool workers_reception_close(struct workers_reception *reception)
         errno = EINVAL;
         return false;
     }
-    struct workers_cleanup_state cleanup = {.service = reception->service};
+    struct workers_cleanup_state cleanup = {.service = reception->service,
+        .reception = reception, .attendant = reception->attendant};
     if (reception->starting_active && !reception->starting_reaped) {
         cleanup.pids[cleanup.count++] = reception->starting.pid;
     }
     for (size_t i = 0; reception->queue != NULL &&
                        i < reception->queue->count; i++) {
-        cleanup.pids[cleanup.count++] = reception->queue->records[i].pid;
+        pid_t pid = reception->queue->records[i].pid;
+        if (!workers_queued_reaped(reception, pid))
+            cleanup.pids[cleanup.count++] = pid;
     }
     cleanup.remaining = cleanup.count;
     for (size_t i = 0; i < cleanup.count; i++) {
@@ -265,7 +359,7 @@ bool workers_reception_close(struct workers_reception *reception)
     }
     reception->starting_reaped = true;
     if (reception->starting_active && reception->starting_record_valid) {
-        if (reception->error != 0 && !reception->demand.stopped) {
+        if (reception->starting_failed) {
             if (!metrics_record_failed(reception->metrics,
                                        &reception->starting)) return false;
         } else if (!metrics_record_cancelled(reception->metrics,
@@ -276,7 +370,15 @@ bool workers_reception_close(struct workers_reception *reception)
     while (reception->queue != NULL && reception->queue->count > 0) {
         struct client_record client;
         if (!client_queue_take_next(reception->queue, &client)) return false;
-        if (!metrics_record_cancelled(reception->metrics, &client)) return false;
+        bool failed = false;
+        for (size_t i = 0; i < reception->failed_queued_count; i++) {
+            if (reception->failed_queued[i] == client.pid) failed = true;
+        }
+        if (failed) {
+            if (!metrics_record_failed(reception->metrics, &client)) return false;
+        } else if (!metrics_record_cancelled(reception->metrics, &client)) {
+            return false;
+        }
     }
     if (reception->queue != NULL && reception->queue->reserved) {
         if (!client_queue_release_reservation(reception->queue)) return false;
@@ -458,6 +560,7 @@ bool workers_attendant_close(struct workers_attendant *attendant)
     int cleanup_error = 0;
     if (attendant->active_valid && !attendant->active_reaped) {
         struct workers_cleanup_state cleanup = {.service = attendant->service,
+            .reception = attendant->reception, .attendant = attendant,
             .pids = {attendant->active.pid}, .count = 1, .remaining = 1};
         if (!processes_send(attendant->active.pid, SIGKILL) && errno != ESRCH)
             return false;

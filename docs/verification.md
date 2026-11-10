@@ -323,3 +323,16 @@ Em 2026-11-10, a Recepção passou a criar `/sem_atend` e `/sem_block` antes de 
 | `timeout -k 5s 90s make test-client` | Passou com o cliente da página 3: N = 1, 11, 125 e infinito com `s`. |
 
 Os testes funcionais não são medições comparativas de desempenho. A US24 ainda trata a propriedade de eventos terminais agrupados durante falhas.
+
+## US24 — Propriedade e coleta de filhos
+
+Em 2026-11-10, a Recepção passou a reconhecer saídas terminais de PIDs ainda enfileirados, e os callbacks de limpeza passaram a registrar o recolhimento também para filhos de outro proprietário. `ownership_test` matou clientes em inicialização, na fila e em atendimento, reuniu eventos terminais em uma coleta e verificou que os três foram contabilizados como falhos sem conclusão. Em outro caso, a limpeza do Atendente consumiu eventos dos clientes da Recepção e ela terminou sem esperar um segundo evento. O teste também herdou `SIGTERM` bloqueado, encerrou o Analista, verificou `ECHILD`, ausência de ambos os semáforos e preservação da máscara original. O cenário de propriedade foi repetido dez vezes sob watchdog.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout -k 2s 30s bash -c 'for iteration in {1..10}; do ./build/ownership_test "$PWD/build/analyst" "$PWD/build/controlled_client" >/dev/null || exit 1; done'` | Dez repetições passaram; watchdog não disparou. |
+| `timeout -k 5s 120s make test` | Suíte completa passou, incluindo o novo teste e os modos finito e infinito. |
+| `timeout -k 5s 120s make debug` | Suíte completa passou com `-O0 -g3`. |
+| `timeout -k 5s 90s make test-client` | Cliente da página 3 passou em N = 1, 11, 125 e infinito com `s`. |
+
+O SHA-256 de `provided/client.c` continuou `915feefbe60d63bb32fc1d348eefefadb740dfefff53211c0d3319b641f63ced`. Depois das suítes, os nomes `/sem_atend` e `/sem_block` estavam ausentes. A verificação de US24 não mede desempenho; as séries da US22 referem-se à revisão anterior e não são comparações de ganho.

@@ -28,12 +28,18 @@ struct workers_reception {
     struct client_record starting;
     workers_other_event_handler other_handler;
     void *other_context;
+    struct workers_attendant *attendant;
+    pid_t reaped_queued[CLIENT_QUEUE_CAPACITY];
+    size_t reaped_queued_count;
+    pid_t failed_queued[CLIENT_QUEUE_CAPACITY];
+    size_t failed_queued_count;
     uint64_t random_state;
     uint64_t next_sequence;
     size_t maximum_waiting;
     bool starting_active;
     bool starting_record_valid;
     bool starting_reaped;
+    bool starting_failed;
     bool cancel_starting_on_stop;
     bool finished;
     int error;
@@ -43,6 +49,7 @@ struct workers_attendant {
     struct service_state *service;
     struct client_queue *queue;
     struct metrics *metrics;
+    struct workers_reception *reception;
     bool *generation_finished;
     bool *stop_requested;
     struct client_record active;

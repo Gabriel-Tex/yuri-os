@@ -108,6 +108,7 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │   ├── analyst_test.c
 │   ├── analyst_coordinator_test.c
 │   ├── service_test.c
+│   ├── ownership_test.c
 │   ├── service_cli_test.sh
 │   ├── reception_test.c
 │   ├── integration_test.sh
@@ -158,6 +159,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
 | `tests/analyst_coordinator_test.c` | Cobrir política de despertar e drenagem com Analista e runtime reais. |
 | `tests/service_test.c` / `service_cli_test.sh` | Cobrir preparação, limpeza e validação da entrada com caminhos reais. |
+| `tests/ownership_test.c` | Cobrir saídas agrupadas, eventos recolhidos durante a limpeza de outro proprietário e `SIGTERM` bloqueado. |
 | `tests/reception_test.c` | Cobrir geração finita, contínua, fila cheia e demanda inválida com filhos reais. |
 | `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
 | `tests/terminal_test.c`, `infinite_service_test.{c,sh}`, `error_service_test.sh` | Verificar entrada, parada, drenagem, sinais e falhas da CLI. |
@@ -309,7 +311,7 @@ Estados da execução: `INITIALIZING`, `RUNNING`, `STOPPING`, `DRAINING` e `FINI
 - **N > 0:** parar a geração após N, concluir todos, drenar também o último lote parcial e então encerrar o Analista.
 - **N = 0, comando s:** parar criações e novos atendimentos, concluir o `IN_SERVICE` atual, cancelar `QUEUED` e `STARTING` e recolher esses filhos. Cancelados não entram no denominador da satisfação.
 - **Drenagem:** despertar e esperar o Analista quantas vezes forem necessárias; confirmar cada parada e o arquivo vazio antes de finalizar.
-- **Finalização:** encerrar o Analista parado com `SIGTERM` e `SIGCONT`, recolhê-lo, liberar recursos em ordem inversa, restaurar terminal e máscaras de sinais, encerrar a medição e emitir o relatório. Clientes ainda parados que foram cancelados podem receber `SIGKILL`, seguido de recolhimento.
+- **Finalização:** encerrar o Analista com `SIGKILL`, recolhê-lo, liberar recursos em ordem inversa, restaurar terminal e máscaras de sinais, encerrar a medição e emitir o relatório. O sinal de encerramento funciona mesmo se a máscara herdada bloquear `SIGTERM`. Clientes ainda parados que foram cancelados recebem `SIGKILL`, seguido de recolhimento.
 
 `SIGINT` e `SIGTERM` solicitam limpeza controlada e diagnóstico. Em N = 0, EOF antes de s é erro para não deixar uma execução sem mecanismo de parada; no finito, EOF apenas desativa o monitoramento da entrada. Entrada redirecionada aceita o byte s; somente TTY exige alteração de `termios`.
 
@@ -359,6 +361,8 @@ O cliente da página 3 do PDF determina estes pontos de integração:
 | Terminal e sinais | Salvar configuração antes de alterá-la e restaurar em todos os caminhos controlados. |
 
 Erros de `fork`/`exec`, saída do cliente por sinal ou com status diferente de zero, demanda inválida, semáforo indisponível, morte do Analista ou falha de arquivo/saída encerram a execução com diagnóstico em `stderr` e status de erro. Não apresentar um finito incompleto como sucesso; identificar qualquer resultado parcial. A limpeza deve aceitar inicialização parcial e repetição sem dupla liberação.
+
+Na US24, a Recepção identifica eventos terminais de seu cliente em inicialização e de PIDs ainda na fila antes de encaminhar eventos ao Atendente. Cada proprietário conserva o estado de recolhimento por PID. Os callbacks de limpeza compartilham esses estados: se a coleta do Atendente consumir a saída de um cliente na fila, a limpeza posterior da Recepção não espera outro evento nem sinaliza o PID recolhido. Saída inesperada observada durante a execução ou na limpeza de outro proprietário conta como falha; clientes mortos pela própria etapa de cancelamento contam como cancelados. Nenhum desses casos entra nas conclusões. O Analista é encerrado após drenagem confirmada ou durante limpeza de erro.
 
 Se um semáforo fixo já existir, falhar com diagnóstico em vez de remover um recurso alheio. `SIGKILL` ou queda do sistema podem deixar resíduos; não há limpeza garantida nesses casos nem recuperação automática destrutiva. Um cliente defeituoso pode não terminar: testes usam watchdog **externo**, sem introduzir timeout de atendimento no produto.
 

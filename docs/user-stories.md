@@ -518,7 +518,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 ## E08 — Conformidade e fechamento da primeira parte
 
-Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. A US23 foi implementada; US24–US27 permanecem abertas.
+Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23 e US24 foram implementadas; US25–US27 permanecem abertas.
 
 ### US23 — Cumprir o protocolo de sincronização do diagrama
 
@@ -540,6 +540,8 @@ Resultado: cumprir o texto e o diagrama do professor e verificar a revisão fina
 **Verificação:** observar criação dos semáforos, retomadas e registro de PIDs com o cliente fornecido. Com a fixture, atrasar a aquisição de `/sem_atend` e provocar saída anormal ou saída zero deixando o semáforo ocupado. Confirmar que não há conclusão bem-sucedida nesses caminhos. Conferir lotes parciais e sucessivos e a origem da solicitação de cada despertar.
 
 ### US24 — Preservar a coleta de todos os filhos durante falhas
+
+**Estado:** implementada e verificada em 2026-11-10. Evidência em [verification.md](verification.md#us24--propriedade-e-coleta-de-filhos).
 
 **Tipo:** técnico · **Depende de:** US07, US19 · **Cobre:** R07–R08, R12, R16.
 

@@ -276,6 +276,8 @@ bool service_run_finite(struct service_state *service, const char *client_path,
     }
     reception.other_handler = workers_attendant_on_event;
     reception.other_context = &attendant;
+    reception.attendant = &attendant;
+    attendant.reception = &reception;
     if (!scheduler_create(&service->scheduler, 0, workers_reception_run,
                           &reception) ||
         !scheduler_create(&service->scheduler, 1, workers_attendant_run,
@@ -361,6 +363,8 @@ bool service_run_infinite(struct service_state *service, const char *client_path
     reception.cancel_starting_on_stop = true;
     reception.other_handler = workers_attendant_on_event;
     reception.other_context = &attendant;
+    reception.attendant = &attendant;
+    attendant.reception = &reception;
     if (!scheduler_create(&service->scheduler, 0, workers_reception_run,
                           &reception) ||
         !scheduler_create(&service->scheduler, 1, workers_attendant_run,
@@ -441,11 +445,9 @@ bool service_close(struct service_state *service, struct service_result *result)
     int error = 0;
     if (service->analyst_pid > 0 && !service->analyst_reaped &&
         service->watcher.initialized) {
-        if (!processes_send(service->analyst_pid, SIGTERM) && errno != ESRCH) {
-            error = errno;
-        }
-        if (!processes_send(service->analyst_pid, SIGCONT) &&
-            errno != ESRCH && error == 0) {
+        /* SIGKILL também funciona se o chamador deixou SIGTERM bloqueado;
+         * o Analista já está drenado ou a execução está em erro. */
+        if (!processes_send(service->analyst_pid, SIGKILL) && errno != ESRCH) {
             error = errno;
         }
         while (!service->analyst_reaped) {
