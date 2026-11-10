@@ -518,9 +518,11 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 ## E08 — Conformidade e fechamento da primeira parte
 
-Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. As histórias deste épico estão pendentes.
+Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. A US23 foi implementada; US24–US27 permanecem abertas.
 
 ### US23 — Cumprir o protocolo de sincronização do diagrama
+
+**Estado:** implementada e verificada em 2026-11-10. Evidência em [verification.md](verification.md#us23--protocolo-de-sincronização-do-diagrama).
 
 **Tipo:** funcional · **Depende de:** US12, US15, US18, US21 · **Cobre:** R02, R09–R12, R16–R17.
 

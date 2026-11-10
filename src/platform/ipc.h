@@ -25,6 +25,8 @@ enum ipc_semaphore {
 /* O_EXCL impede adotar ou remover semáforos preexistentes. Falha parcial
  * libera somente recursos criados por esta chamada. */
 bool ipc_service_init(struct ipc_service *service);
+bool ipc_service_lock_init(struct ipc_service *service);
+bool ipc_service_create_semaphores(struct ipc_service *service);
 bool ipc_service_close(struct ipc_service *service);
 
 /* EAGAIN significa ocupado e retorna sucesso com acquired=false. */

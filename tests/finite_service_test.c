@@ -21,13 +21,14 @@ static void check_no_children_or_semaphores(void)
 }
 
 static void run_failure(struct service_config *config, const char *client_path,
-                        const char *mode, bool kill_analyst)
+                        const char *mode, bool invalid_analyst)
 {
     struct service_state service = {0};
     struct service_result result = {0};
     if (mode != NULL) assert(setenv("CONTROLLED_CLIENT_MODE", mode, 1) == 0);
-    assert(service_prepare(&service, config));
-    if (kill_analyst) assert(kill(service.analyst_pid, SIGKILL) == 0);
+    struct service_config selected = *config;
+    if (invalid_analyst) selected.analyst_path = "/tmp/analyst-inexistente-us23";
+    assert(service_prepare(&service, &selected));
     assert(!service_run_finite(&service, client_path, &result));
     assert(!result.complete);
     assert(service_close(&service, &result));

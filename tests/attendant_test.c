@@ -34,16 +34,22 @@ static void idle_reception(void *argument)
 }
 
 static void run_case(const char *analyst_path, const char *client_path,
-                     bool signal_failure)
+                     const char *mode, bool expected_failure)
 {
     struct service_state service = {0};
     char *project_root = getcwd(NULL, 0);
     assert(project_root != NULL);
     struct service_config config = {.client_count = 1,
-        .max_patience_ms = signal_failure ? 1000 : 1,
+        .max_patience_ms = expected_failure ? 1000 : 1,
         .project_root = project_root,
         .analyst_path = analyst_path};
     assert(service_prepare(&service, &config));
+    assert(ipc_service_create_semaphores(&service.ipc));
+    assert(service_start_analyst(&service));
+    while (!service_analyst_ready(&service)) {
+        assert(service_process_events(&service));
+        if (!service_analyst_ready(&service)) assert(service_wait_events(&service));
+    }
     struct client_queue queue;
     struct metrics metrics;
     assert(client_queue_init(&queue) && metrics_init(&metrics));
@@ -52,7 +58,7 @@ static void run_case(const char *analyst_path, const char *client_path,
     assert(workers_attendant_init(&attendant, &service, &queue, &metrics,
                                   &generation_finished));
     char *arguments[] = {(char *)client_path,
-        signal_failure ? "service_signal" : "service_late", NULL};
+        (char *)mode, NULL};
     pid_t pid;
     assert(processes_spawn(&service.watcher, client_path, arguments,
                            service.run_directory, &pid));
@@ -78,7 +84,7 @@ static void run_case(const char *analyst_path, const char *client_path,
                             &attendant));
     bool ran = scheduler_run_events(&service.scheduler, service_process_events,
                                     service_wait_events, &service);
-    if (signal_failure) {
+    if (expected_failure) {
         assert(!ran && attendant.active_reaped);
         assert(workers_attendant_close(&attendant));
         assert(metrics.failed == 1 && metrics.completed == 0);
@@ -113,8 +119,9 @@ static void run_case(const char *analyst_path, const char *client_path,
 int main(int argc, char **argv)
 {
     assert(argc == 3);
-    run_case(argv[1], argv[2], false);
-    run_case(argv[1], argv[2], true);
-    puts("Atendente: conclusão tardia e falha por sinal confirmadas.");
+    run_case(argv[1], argv[2], "service_late", false);
+    run_case(argv[1], argv[2], "service_signal", true);
+    run_case(argv[1], argv[2], "service_hold", true);
+    puts("Atendente: conclusão tardia, falha por sinal e semáforo ocupado confirmados.");
     return 0;
 }

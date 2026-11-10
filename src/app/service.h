@@ -51,6 +51,7 @@ struct service_state {
     bool initialized;
     bool input_enabled;
     bool stop_requested;
+    bool analyst_wake_requested;
     int event_error;
     service_client_event_handler client_handler;
     void *client_context;
@@ -60,6 +61,10 @@ struct service_state {
  * absolutos e cria as duas rotinas no scheduler antes de executá-lo. */
 bool service_prepare(struct service_state *service,
                      const struct service_config *config);
+/* A Recepção chama após criar os semáforos; a parada inicial é observada
+ * pelo coletor de eventos antes de qualquer cliente ser criado. */
+bool service_start_analyst(struct service_state *service);
+bool service_analyst_ready(void *context);
 bool service_process_events(void *context);
 bool service_wait_events(void *context);
 /* Executa N > 0 com o cliente indicado; exige todos os atendimentos e drena

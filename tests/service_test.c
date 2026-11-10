@@ -33,6 +33,12 @@ int main(int argc, char **argv)
                                     .analyst_path = argv[1]};
     struct service_state service = {0};
     CHECK(service_prepare(&service, &config));
+    CHECK(ipc_service_create_semaphores(&service.ipc));
+    CHECK(service_start_analyst(&service));
+    while (!service_analyst_ready(&service)) {
+        CHECK(service_process_events(&service));
+        if (!service_analyst_ready(&service)) CHECK(service_wait_events(&service));
+    }
     CHECK(service.initialized && service.analyst_pid > 0);
     CHECK(service.coordinator.state == ANALYST_COORDINATOR_STOPPED);
     CHECK(service.run_directory != NULL);
@@ -54,7 +60,12 @@ int main(int argc, char **argv)
 
     config.client_count = 3;
     config.analyst_path = "/no/such/analyst";
-    CHECK(!service_prepare(&service, &config));
+    CHECK(service_prepare(&service, &config));
+    CHECK(ipc_service_create_semaphores(&service.ipc));
+    CHECK(service_start_analyst(&service));
+    CHECK(!service_process_events(&service) || !service_wait_events(&service) ||
+          !service_process_events(&service));
+    CHECK(service_close(&service, NULL));
     CHECK(service.run_directory == NULL);
     CHECK(waitpid(-1, &child_status, WNOHANG) == -1 && errno == ECHILD);
     CHECK(service_close(&service, NULL));

@@ -115,8 +115,12 @@ bool service_process_events(void *context)
             return false;
         }
     }
-    bool woken;
-    return analyst_coordinator_maybe_wake(&service->coordinator, false, &woken);
+    if (service->analyst_wake_requested) {
+        bool woken;
+        return analyst_coordinator_maybe_wake(&service->coordinator, false,
+                                               &woken);
+    }
+    return true;
 }
 
 bool service_wait_events(void *context)
@@ -201,42 +205,42 @@ bool service_prepare(struct service_state *service,
     if (!clock_monotonic_ns(&service->start_ns) ||
         !processes_watcher_init(&service->watcher) ||
         !interrupt_init(&service->interruption) ||
-        !ipc_service_init(&service->ipc) ||
+        !ipc_service_lock_init(&service->ipc) ||
         !service_make_directory(service, config->project_root) ||
-        !completion_file_open(&service->completion, service->run_directory,
-                              service->ipc.block, true) ||
         !scheduler_init(&service->scheduler, NULL, NULL, NULL)) {
         int error = errno;
         service_close(service, NULL);
         errno = error;
         return false;
     }
-    char *arguments[] = {(char *)config->analyst_path,
-                         service->run_directory, NULL};
-    if (!processes_spawn(&service->watcher, config->analyst_path, arguments,
-                         service->run_directory, &service->analyst_pid) ||
-        !analyst_coordinator_init(&service->coordinator, service->analyst_pid,
-                                   &service->completion, &service->scheduler)) {
-        int error = errno;
-        service_close(service, NULL);
-        errno = error;
-        return false;
-    }
-    /* A parada inicial é confirmada fora das rotinas de usuário. */
-    while (service->coordinator.state == ANALYST_COORDINATOR_STARTING &&
-           service->event_error == 0) {
-        if (!service_process_events(service)) break;
-        if (service->coordinator.state == ANALYST_COORDINATOR_STARTING &&
-            !service_wait_events(service)) break;
-    }
-    if (service->coordinator.state != ANALYST_COORDINATOR_STOPPED) {
-        int error = service->event_error != 0 ? service->event_error : errno;
-        service_close(service, NULL);
-        errno = error;
-        return false;
-    }
     service->initialized = true;
     return true;
+}
+
+bool service_start_analyst(struct service_state *service)
+{
+    if (service == NULL || !service->initialized ||
+        !service->ipc.attend_owned || !service->ipc.block_owned ||
+        service->analyst_pid > 0) {
+        errno = EINVAL;
+        return false;
+    }
+    if (!completion_file_open(&service->completion, service->run_directory,
+                              service->ipc.block, true)) return false;
+    char *arguments[] = {(char *)service->config.analyst_path,
+                         service->run_directory, NULL};
+    if (!processes_spawn(&service->watcher, service->config.analyst_path,
+                         arguments, service->run_directory,
+                         &service->analyst_pid)) return false;
+    return analyst_coordinator_init(&service->coordinator, service->analyst_pid,
+                                     &service->completion, &service->scheduler);
+}
+
+bool service_analyst_ready(void *context)
+{
+    const struct service_state *service = context;
+    return service->coordinator.state == ANALYST_COORDINATOR_STOPPED ||
+           service->event_error != 0;
 }
 
 bool service_run_finite(struct service_state *service, const char *client_path,
@@ -289,8 +293,8 @@ bool service_run_finite(struct service_state *service, const char *client_path,
         error = EPROTO;
         goto cleanup;
     }
-    if (!analyst_coordinator_request_drain(&service->coordinator)) {
-        error = errno;
+    if (!service->coordinator.draining) {
+        error = EPROTO;
         goto cleanup;
     }
     bool drained = false;
@@ -379,8 +383,8 @@ bool service_run_infinite(struct service_state *service, const char *client_path
     }
     attendant_ready = false;
     reception_ready = false;
-    if (!analyst_coordinator_request_drain(&service->coordinator)) {
-        error = errno;
+    if (!service->coordinator.draining) {
+        error = EPROTO;
         goto cleanup;
     }
     bool drained = false;
@@ -505,6 +509,7 @@ bool service_close(struct service_state *service, struct service_result *result)
     service->analyst_pid = 0;
     service->analyst_reaped = false;
     service->event_error = 0;
+    service->analyst_wake_requested = false;
     if (error != 0) {
         errno = error;
         return false;

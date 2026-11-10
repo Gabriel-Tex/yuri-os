@@ -38,7 +38,8 @@ int main(int argc, char **argv)
     }
     if (argc == 1 || (argc == 2 &&
         (strcmp(argv[1], "service_late") == 0 ||
-         strcmp(argv[1], "service_signal") == 0)))
+         strcmp(argv[1], "service_signal") == 0 ||
+         strcmp(argv[1], "service_hold") == 0)))
     {
         FILE *file = fopen("demanda.txt", "w");
         if (file == NULL) return 20;
@@ -62,6 +63,11 @@ int main(int argc, char **argv)
         do { acquired = sem_wait(semaphore); }
         while (acquired == -1 && errno == EINTR);
         if (acquired == -1) { sem_close(semaphore); return 24; }
+        if (argc == 2 && strcmp(argv[1], "service_hold") == 0)
+        {
+            sem_close(semaphore);
+            return 0;
+        }
         struct timespec service = {.tv_sec = 0, .tv_nsec = 1000000};
         while (nanosleep(&service, &service) == -1 && errno == EINTR) {}
         int released = sem_post(semaphore);

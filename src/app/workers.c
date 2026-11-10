@@ -150,6 +150,18 @@ void workers_reception_on_event(void *context,
 void workers_reception_run(void *argument)
 {
     struct workers_reception *reception = argument;
+    /* A Recepção estabelece o protocolo antes de liberar o Analista ou
+     * criar o primeiro Cliente. A espera cede o contexto ao escalonador. */
+    if (!ipc_service_create_semaphores(&reception->service->ipc) ||
+        !service_start_analyst(reception->service) ||
+        !scheduler_wait(&reception->service->scheduler,
+                        ANALYST_COORDINATOR_EVENT, service_analyst_ready,
+                        reception->service) ||
+        reception->service->coordinator.state != ANALYST_COORDINATOR_STOPPED) {
+        workers_fail(reception, errno != 0 ? errno : EPROTO);
+        reception->finished = true;
+        return;
+    }
     while (!workers_should_stop(reception) && reception->error == 0) {
         if (!client_queue_has_space(reception->queue)) {
             if (!scheduler_wait(&reception->service->scheduler,
@@ -382,6 +394,22 @@ void workers_attendant_run(void *argument)
             break;
         }
         if (attendant->error != 0 || !attendant->completed_ok) break;
+        /* Saída zero e semáforo disponível são ambos necessários. A
+         * tentativa posterior à saída não bloqueia a outra rotina. */
+        bool available;
+        if (!ipc_try_acquire(&attendant->service->ipc, IPC_ATTEND,
+                             &available)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
+        if (!available) {
+            workers_attendant_fail(attendant, EPROTO);
+            break;
+        }
+        if (!ipc_release(&attendant->service->ipc, IPC_ATTEND)) {
+            workers_attendant_fail(attendant, errno);
+            break;
+        }
         if (!metrics_record_completed(attendant->metrics, &attendant->active,
                                       attendant->completion_ns)) {
             workers_attendant_fail(attendant, errno);
@@ -413,6 +441,11 @@ void workers_attendant_run(void *argument)
             break;
         }
     }
+    if (attendant->error == 0 &&
+        !analyst_coordinator_request_drain(&attendant->service->coordinator))
+        workers_attendant_fail(attendant, errno);
+    if (attendant->error == 0)
+        attendant->service->analyst_wake_requested = true;
     attendant->finished = attendant->error == 0;
 }
 

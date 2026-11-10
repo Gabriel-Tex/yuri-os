@@ -311,3 +311,15 @@ Em 2026-11-09, revisão `a5ba4dc`. A auditoria cruzou o texto da página 1, o di
 | US26 — Origem da medição | A nota 4 mede a chegada entre o início do programa e a criação do cliente. `main` valida argumentos e resolve os executáveis antes de `service_prepare` capturar a origem de `start_ns`. Essa constatação vem da inspeção do código. A auditoria não quantificou a duração omitida. |
 
 As medições da US22 continuam válidas para a revisão e a janela que foram usadas. A satisfação baixa observada com X = 5 ms faz parte da referência de desempenho. O enunciado não define uma taxa mínima nem um tempo máximo como requisito de aceite. A US27 exige uma referência na revisão final após os ajustes de conformidade.
+
+## US23 — Protocolo de sincronização do diagrama
+
+Em 2026-11-10, a Recepção passou a criar `/sem_atend` e `/sem_block` antes de iniciar o Analista ou criar clientes. O Atendente passou a exigir saída zero e disponibilidade posterior de `/sem_atend` antes de registrar conclusão; o pedido de drenagem é feito por ele antes de terminar. `attendant_test` usa uma fixture que demora antes de adquirir o semáforo, outra que morre por sinal e outra que sai com status zero deixando o semáforo ocupado. Esta última não entra nas conclusões. O teste de Recepção cobre geração finita, contínua e limite de 100; os testes de arquivo e coordenador cobrem lotes parciais e 27 PIDs em 10, 10 e 7.
+
+| Comando | Resultado observado |
+|---|---|
+| `timeout -k 5s 120s make test` | Passou, inclusive os cenários novos do Atendente, sem avisos de compilação. |
+| `timeout -k 5s 120s make debug` | Passou com `-O0 -g3`, sem avisos de compilação. |
+| `timeout -k 5s 90s make test-client` | Passou com o cliente da página 3: N = 1, 11, 125 e infinito com `s`. |
+
+Os testes funcionais não são medições comparativas de desempenho. A US24 ainda trata a propriedade de eventos terminais agrupados durante falhas.

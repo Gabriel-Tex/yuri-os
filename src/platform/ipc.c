@@ -37,7 +37,7 @@ static sem_t *ipc_owned_handle(struct ipc_service *service,
     return NULL;
 }
 
-bool ipc_service_init(struct ipc_service *service)
+bool ipc_service_lock_init(struct ipc_service *service)
 {
     if (service == NULL || service->lock_owned || service->attend_owned ||
         service->block_owned || service->attend != NULL ||
@@ -76,6 +76,16 @@ bool ipc_service_init(struct ipc_service *service)
     }
     service->lock_fd = fd;
     service->lock_owned = true;
+    return true;
+}
+
+bool ipc_service_create_semaphores(struct ipc_service *service)
+{
+    if (service == NULL || !service->lock_owned || service->attend != NULL ||
+        service->block != NULL || service->attend_owned || service->block_owned) {
+        errno = EINVAL;
+        return false;
+    }
     service->attend = sem_open(IPC_ATTEND_NAME, O_CREAT | O_EXCL, 0600, 1);
     if (service->attend == SEM_FAILED) {
         service->attend = NULL;
@@ -95,6 +105,12 @@ bool ipc_service_init(struct ipc_service *service)
     }
     service->block_owned = true;
     return true;
+}
+
+bool ipc_service_init(struct ipc_service *service)
+{
+    return ipc_service_lock_init(service) &&
+           ipc_service_create_semaphores(service);
 }
 
 bool ipc_service_close(struct ipc_service *service)
