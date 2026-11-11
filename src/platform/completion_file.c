@@ -168,9 +168,8 @@ static bool completion_rewrite_suffix(struct completion_file *file,
             error = errno;
         }
     }
-    if (error == 0 && fsync(temporary_fd) == -1) {
-        error = errno;
-    }
+    /* O arquivo é transitório. renameat publica o conteúdo para os leitores
+     * sob /sem_block, sem exigir que cada lote chegue ao disco. */
     if (error == 0 && renameat(file->directory_fd, temporary_name,
                                 file->directory_fd, COMPLETION_FILE_NAME) == -1) {
         error = errno;

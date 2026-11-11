@@ -292,6 +292,8 @@ Na US10, `completion_file_open` cria `completed.log` somente se ausente no servi
 
 `completed.log` contém um PID decimal por linha, na ordem das conclusões. `/sem_block` protege o arquivo e `/sem_atend` preserva o nome esperado pelo cliente ilustrado.
 
+A compactação publica o temporário por `renameat` sob `/sem_block`. Como o arquivo só existe durante a execução, a troca não espera que o lote chegue ao disco. Uma falha de gravação detectada apenas na escrita posterior pelo kernel pode deixar de ser relatada durante a compactação. A confirmação da drenagem continua sendo a leitura do arquivo vazio após a parada do Analista.
+
 1. O Atendente solicita o despertar; o serviço envia `SIGCONT` somente se o Analista estiver comprovadamente parado e houver PIDs pendentes.
 2. O Analista adquire a proteção, imprime e confirma a saída de até dez primeiros PIDs, remove esses registros, libera a proteção e volta a `SIGSTOP`.
 3. O serviço observa a nova parada antes de autorizar outro lote. Desperta ao chegar a dez PIDs, durante ociosidade com pendências ou ao drenar o arquivo.

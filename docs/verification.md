@@ -473,3 +473,29 @@ As 20 execuções passaram no verificador de relatório. Em cada uma, N clientes
 | Enunciado | 125 | 2, 2, 2, 2, 2 | 1014.217 · 875.764 · 833.903 · 1021.384 · 1565.164 | 1,60% | 833.903 / 1014.217 / 1565.164 |
 
 As séries descrevem o modo finito nas condições observadas. O modo infinito foi verificado funcionalmente. A referência anterior, da US22, usou outra origem de medição. A tabela atual é uma referência da entrega, sem comparação de ganho entre revisões.
+
+## Avaliação do fsync por lote do Analista
+
+Em 2026-11-10, a revisão `85e809f` e a variante que retira o `fsync` do arquivo temporário de cada lote foram compiladas em cópias limpas com GCC 13.3.0, C17 e `-O2 -g`. Ambiente Linux 7.0.0-42-generic x86_64, glibc 2.39, ext4, Intel Core i5-7200U com quatro CPUs lógicas. A carga média de um minuto variou de 2,84 no início a 3,28 no fim. A variante mantém as gravações, `renameat`, `/sem_block` e a verificação da drenagem. Os hashes de `provided/client.c` coincidiram nas duas versões.
+
+| Comando na variante | Resultado observado |
+|---|---|
+| `timeout -k 5s 120s make -j4` | Build limpo sem avisos. |
+| `timeout -k 5s 120s make test` | Passou, inclusive ordem dos PIDs, limite dos lotes, saída com `ENOSPC` em `/dev/full`, parada durante lote ativo e limpeza. |
+| `timeout -k 5s 120s make debug` | Passou com `-O0 -g3`, sem avisos. |
+| `timeout -k 5s 120s make test-client` | Passou com o cliente oficial nos dois modos. |
+
+Para cada cenário finito da tabela, foram executados seis pares de `bash tests/benchmark.sh CLIENTE N X 1` sob watchdog, uma vez por versão em cada par. A ordem alternou entre revisão de referência primeiro e variante primeiro. A CLI mediu da entrada em `main` até a limpeza. Cada execução validou N conclusões, N PIDs distintos, contadores, taxa e tempo. Os semáforos e diretórios de execução estavam ausentes entre todas as repetições. A semente do cliente oficial depende do relógio, portanto os pares preservam a carga original, com demandas que podem se repetir dentro do mesmo segundo ou variar entre execuções.
+
+| Cliente | N | X (ms) | Satisfação mediana, referência → variante | Tempo mediano (ms), referência → variante | Variante mais rápida |
+|---|---:|---:|---:|---:|---:|
+| Oficial | 1 | 5 | 100% → 100% | 110,966 → 57,116 | 5/6 |
+| Oficial | 11 | 5 | 18,18% → 100% | 161,608 → 67,232 | 6/6 |
+| Oficial | 125 | 1 | 0% → 6,00% | 791,408 → 188,640 | 6/6 |
+| Oficial | 125 | 5 | 1,60% → 98,40% | 996,030 → 185,772 | 6/6 |
+| Oficial | 125 | 20 | 1,60% → 100% | 1.186,163 → 234,273 | 6/6 |
+| Controlado | 125 | 5 | 1,20% → 1,60% | 1.222,562 → 313,995 | 6/6 |
+
+No infinito, foram executados seis pares com `./build/service 0 5` e cliente oficial. Um processo de teste iniciou a CLI com stdin em pipe e stdout em arquivo temporário, enviou `s` 500 ms após iniciar o subprocesso e mediu do envio até o retorno da CLI. O envio ocorreu entre 500,02 e 500,27 ms nas 12 execuções. O relatório passou em todos os casos com PIDs únicos antes dos contadores, denominador igual às conclusões, satisfação coerente e tempo positivo. A mediana passou de 57 para 403 conclusões e de 2,83% para 98,58% de satisfação. A mediana entre o envio de `s` e a saída passou de 86,708 para 0,628 ms. A primeira janela inclui a inicialização externa do subprocesso e a segunda inclui drenagem e limpeza.
+
+A variante foi mais rápida em 35 de 36 pares finitos. A satisfação do cliente controlado variou e a diferença mediana foi de meio cliente, insuficiente para concluir ganho nessa métrica. O prazo de 1 ms continua difícil mesmo com menor tempo total. A retirada do `fsync` elimina a confirmação de gravação em disco a cada lote e a oportunidade de detectar erros que só aparecem nessa chamada. A avaliação exercitou erros de saída e encerramento controlado, sem simular falha do disco ou queda de energia.
