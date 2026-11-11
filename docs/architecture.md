@@ -2,7 +2,7 @@
 
 Esta arquitetura cobre a primeira parte do trabalho prático. Registro, fila, métricas, threads de usuário, processos, IPC, Analista, atendimento finito, parada do modo infinito e limpeza controlada (US01–US19) estão implementados com testes. A estrutura abaixo descreve também os módulos ainda previstos. O [backlog](user-stories.md) organiza a entrega e o [AGENTS.md](../AGENTS.md) reúne as convenções de desenvolvimento.
 
-A auditoria após o épico 7 identificou desvios no protocolo do diagrama e na origem do tempo, além de casos de bloqueio e de validação fora da suíte original. A descrição do fluxo neste documento registra a implementação atual. O épico 8 define os ajustes e o critério de fechamento. [Histórias pendentes](user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
+A auditoria após o épico 7 identificou desvios no protocolo do diagrama e na origem do tempo, além de casos de bloqueio e de validação fora da suíte original. O épico 8 registra as correções e a verificação da primeira parte. [Evidências executadas na revisão de entrega](verification.md#matriz-de-evidências-executadas).
 
 ## Fontes e alcance
 

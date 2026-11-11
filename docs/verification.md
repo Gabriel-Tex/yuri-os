@@ -364,3 +364,112 @@ Em 2026-11-10, CLI e domínio passaram a usar `CLIENT_MAX_PATIENCE_MS = 18.446.7
 | `timeout -k 3s 30s bash -c 'for iteration in {1..10}; do SERVICE_CLIENT_PATH="$PWD/build/controlled_client" ./build/service 1 18446744073709 >/dev/null || exit 1; done'` | Dez execuções com X máximo passaram, sem diretórios de execução remanescentes. |
 
 O cliente fornecido permaneceu sem alteração. Estes testes comprovam correção e compatibilidade nas condições executadas; não constituem medição comparativa de satisfação ou tempo.
+
+## US27 — Verificação da primeira parte
+
+Em 2026-11-10, a revisão de código `bdea2df20a1a67a05a32bf2c41da16ea262c62b1` foi extraída com `git archive` para um diretório novo em `/tmp`. As fontes da aplicação, do cliente e dos testes verificadas abaixo são as da entrega. O commit da US27 registra a evidência e atualiza o estado da documentação.
+
+### Reprodução e resultados
+
+Execute na raiz do repositório, sem outra instância ativa. As suítes são sequenciais porque usam os mesmos nomes de semáforo.
+
+```bash
+set -euo pipefail
+revision=bdea2df20a1a67a05a32bf2c41da16ea262c62b1
+check_dir=$(mktemp -d /tmp/so-yuri-us27-XXXXXX)
+git archive "$revision" | tar -x -C "$check_dir"
+cd "$check_dir"
+export LC_ALL=C
+unset SERVICE_CLIENT_PATH CONTROLLED_CLIENT_MODE
+sha256sum docs/descfinal.pdf provided/client.c
+timeout -k 5s 120s make -j4
+test -x build/service && test -x build/analyst && test -x build/client || exit 1
+for target in test debug test-client; do
+    timeout -k 5s 120s make "$target"
+    test ! -e /dev/shm/sem.sem_atend
+    test ! -e /dev/shm/sem.sem_block
+    test -z "$(find run -maxdepth 1 -name 'execution-*' -print)"
+done
+ldd build/service build/analyst build/client
+```
+
+| Comando | Resultado observado |
+|---|---|
+| `sha256sum docs/descfinal.pdf provided/client.c` | Os dois hashes coincidiram com os do [registro de origem](../provided/README.md), inclusive `915feefbe60d63bb32fc1d348eefefadb740dfefff53211c0d3319b641f63ced` para o cliente. |
+| `timeout -k 5s 120s make -j4` | Build limpo concluído. Produziu os três executáveis. O código próprio compilou em C17 com `-Wall -Wextra -Wpedantic`, sem avisos. |
+| `timeout -k 5s 120s make test` | Suíte controlada passou, inclusive as regressões US23–US26. |
+| `timeout -k 5s 120s make debug` | A mesma suíte passou com `-O0 -g3`, sem avisos. |
+| `timeout -k 5s 120s make test-client` | Cliente oficial passou no finito com N = 1, 11 e 125 e no infinito com `s`, incluindo entrada contínua. A suíte também confirmou o erro esperado no EOF sem `s`. X = 10000 ms nos cenários de atendimento. |
+| `ldd build/service build/analyst build/client` | Os três binários listaram libc, carregador e vDSO do Linux. A inspeção de `src/`, `provided/` e do Makefile não encontrou uso de pthread, OpenMP ou threads C11. |
+
+Todos os watchdogs acima terminaram com status zero. Os testes de serviço e propriedade verificaram `ECHILD` no pai após o recolhimento. Os dois semáforos nomeados e os diretórios `execution-*` estavam ausentes após cada suíte.
+
+### Rastreamento do cliente oficial
+
+A execução abaixo foi feita na mesma cópia, fora da sandbox porque ela bloqueia `ptrace`. O rastreamento tem sobrecarga e fica fora da série de tempos.
+
+```bash
+timeout -k 5s 40s env -u SERVICE_CLIENT_PATH -u CONTROLLED_CLIENT_MODE LC_ALL=C \
+    strace -f -s 128 -o trace.log \
+    -e trace=%process,%signal,openat,read,write,link,linkat,unlink,unlinkat,renameat,renameat2,clock_nanosleep \
+    ./build/service 11 10000 >trace.out 2>trace.err
+test ! -s trace.err
+awk -v expected=11 -f tests/finite_report.awk trace.out
+```
+
+O pai criou os dois semáforos antes do `execve` do Analista e dos clientes. O PID escrito em `analyst.pid` correspondeu ao processo criado. Para os 11 clientes, o pai consumiu e removeu a demanda após a parada inicial e antes da próxima execução de cliente. Cada cliente abriu `/sem_atend` após `SIGCONT` e solicitou 1 µs de espera nesta amostra. Comparando `wait4`, as gravações do pai e `trace.out`, os mesmos 11 PIDs aparecem na mesma ordem. O Analista imprimiu lotes de 1, 8 e 2, retornou a `SIGSTOP` após cada lote e foi recolhido. O último `wait4` do pai retornou `ECHILD`. Os semáforos e o diretório da execução foram removidos.
+
+### Matriz de evidências executadas
+
+Todas as linhas referem-se à revisão `bdea2df`. Os nomes de testes C e de scripts da suíte indicam os casos executados por `make test` e `make debug`. Os comandos completos estão nas seções anteriores.
+
+| Requisito | Comando ou caso exercitado | Resultado e alcance |
+|---|---|---|
+| R01 | `make -j4`, `ldd` e inspeção de fontes | Build C17 no Linux, sem biblioteca de concorrência ou IPC delegada. Ambiente verificado com glibc. |
+| R02 | `scheduler_test`, `service_test` e inspeção de `service.c` | Pilhas e contextos distintos, alternância e espera por evento. Os dois modos criam Recepção e Atendente no escalonador do projeto. |
+| R03 | `service_cli_test.sh`, `make test-client` | N inválido e X fora da faixa recusados, X máximo aceito, N = 1, 11, 125 e 0 exercitados. |
+| R04 | `reception_test` e inspeção de `workers.c` | Os 256 valores do teste se dividem em 128 por classe pelo mapeamento de um bit. A Recepção sorteia a cada cliente. As séries pequenas não estimam a distribuição. |
+| R05 | `domain_test`, `client_queue_test`, `reception_test` | X par e ímpar, X/2 exato e ordem EDF mantida acima de `UINT64_MAX`. |
+| R06 | `metrics_test`, `attendant_test` e inspeção de `metrics.c` | Conclusão no prazo conta como satisfeita e ultrapassar por 1 ns não conta. Cliente atrasado também conclui. A diferença usa a chegada junto ao `fork` e a saída zero observada. |
+| R07 | `make test-client`, `finite_service_test`, `error_service_test.sh` | Criados = concluídos = N e taxa coerente no sucesso. Falhas controladas geram erro sem relatório completo. |
+| R08 | `infinite_service_test.sh`, `stop_phase_test` | `s` em pipe e TTY, inclusive sob entrada contínua. PIDs e denominador correspondem às conclusões. Zero conclusões gera taxa não aplicável. |
+| R09 | `completion_file_test` e rastreamento | Inclusão e leitura do arquivo verificadas. As 11 saídas zero coincidiram com as gravações e impressões, em ordem. |
+| R10 | `analyst_test`, `analyst_coordinator_test`, rastreamento e inspeção de `workers.c` | O Analista para inicialmente e entre os lotes. O Atendente pede os despertares e a drenagem. |
+| R11 | `completion_file_test`, `analyst_test`, `analyst_coordinator_test` e rastreamento | Ordem e limite de dez por despertar. No teste do coordenador, 27 PIDs saíram em 10, 10 e 7, seguidos de um PID adiado em lote próprio. |
+| R12 | `analyst_coordinator_test`, `stop_phase_test`, `infinite_service_test.sh` | O coordenador confirmou parada e arquivo vazio. A parada com lote ativo usou Analista controlado. O oficial drenou todos os PIDs concluídos antes do relatório. |
+| R13 | `domain_test`, `demand_test`, `reception_test`, `service_test` e inspeção de `service_main.c` | Registro completo, chegada relativa à origem fornecida e origem capturada na entrada de `main`. O instante da criação é amostrado antes do `fork`. |
+| R14 | `demand_test`, `reception_test` e rastreamento | Segunda inicialização recusada antes de consumir a demanda. Todos os clientes oficiais rastreados escreveram, pararam e tiveram o arquivo consumido em sequência. |
+| R15 | `reception_test`, `stop_phase_test` | Fila de 100 com pausa, retomada após vaga e parada com fila cheia. O controle de fase usa a fixture. |
+| R16 | `ipc_test`, `attendant_test`, `analyst_test`, rastreamento e inspeção de `workers.c` e `completion_file.c` | A Recepção cria ambos os semáforos. O Atendente verifica `/sem_atend` sem bloquear. Saída zero com semáforo ocupado foi recusada. O arquivo usa `/sem_block` e o PID do Analista foi conferido. A execução sem contenção pode usar operações atômicas da glibc sem syscall visível. |
+| R17 | `sha256sum`, `make test-client` e rastreamento | Fonte confirmada pela US21, hashes conferidos e executável oficial exercitado nos dois modos. |
+| R18 | `metrics_test`, `service_test`, `make test-client` e inspeção de `service_main.c` | Conversões e origem fornecida verificadas. A CLI relata tempo positivo da entrada de `main` até depois da limpeza, antes do relatório. |
+| P01 | Rastreamento e `demand_test` | Escrita decimal, parada inicial e consumo após a parada. |
+| P02 | Rastreamento e `attendant_test` | Abertura de `/sem_atend` após retomada no oficial e rejeição de conclusão com semáforo ocupado na fixture. |
+| P03 | Rastreamento, inspeção de `provided/client.c` e `domain_test` | A amostra solicitou 1 µs. A fonte contém as opções 1, 5 e 15 µs e o domínio interpreta X em ms. |
+| P04 | Inspeção de `provided/client.c` e conferência de hash | `srand(time(NULL))` preservado. O rastreamento observou demandas repetidas e não estima frequências. |
+| P05 | `sha256sum` e proveniência US21 | PDF e transcrição conferem com a versão confirmada para a entrega. |
+
+As regressões da auditoria passaram na revisão de entrega. `attendant_test` e o rastreamento cobrem o protocolo da US23. `ownership_test` cobre eventos agrupados e limpeza com `SIGTERM` bloqueado da US24. `terminal_test`, `infinite_service_test.sh` e `stop_phase_test` cobrem a US25. Os testes de domínio, fila, serviço e CLI cobrem os limites e a origem da US26. A verificação cobre as execuções e falhas exercitadas, sem injetar falha em cada syscall nem simular queda do sistema.
+
+### Referência de satisfação e tempo da entrega
+
+Foram feitas quatro séries finitas de cinco execuções, com X = 5 ms, na mesma revisão e cópia limpa. Ambiente Linux 7.0.0-42-generic x86_64, glibc 2.39, GCC 13.3.0, C17 com `-O2 -g`, Intel Core i5-7200U e quatro CPUs lógicas acessíveis. A carga média de um minuto passou de 2,04 antes das séries para 2,57 depois. Cada repetição gravou stdout em arquivo temporário e usou a duração da própria CLI, da entrada em `main` até o fim da limpeza. A fixture solicita 1.000 µs e o cliente oficial solicita 1, 5 ou 15 µs conforme o sorteio da fonte.
+
+```bash
+for client in controlled official; do
+    for count in 11 125; do
+        timeout -k 5s 240s bash tests/benchmark.sh "$client" "$count" 5 5
+    done
+done
+```
+
+As 20 execuções passaram no verificador de relatório. Em cada uma, N clientes concluíram e N PIDs distintos precederam o relatório. Os semáforos e diretórios de execução estavam ausentes após cada série.
+
+| Cliente | N | Satisfeitos por repetição | Tempo total por repetição (ms) | Mediana da taxa | Tempo mín. / mediana / máx. (ms) |
+|---|---:|---|---|---:|---|
+| Controlado | 11 | 1, 4, 2, 3, 3 | 432.862 · 397.190 · 264.496 · 248.622 · 263.741 | 27,27% | 248.622 / 264.496 / 432.862 |
+| Controlado | 125 | 7, 4, 2, 4, 3 | 1081.073 · 1095.486 · 1016.547 · 1040.628 · 1514.633 | 3,20% | 1016.547 / 1081.073 / 1514.633 |
+| Enunciado | 11 | 2, 1, 2, 2, 2 | 243.112 · 309.918 · 263.026 · 272.885 · 220.316 | 18,18% | 220.316 / 263.026 / 309.918 |
+| Enunciado | 125 | 2, 2, 2, 2, 2 | 1014.217 · 875.764 · 833.903 · 1021.384 · 1565.164 | 1,60% | 833.903 / 1014.217 / 1565.164 |
+
+As séries descrevem o modo finito nas condições observadas. O modo infinito foi verificado funcionalmente. A referência anterior, da US22, usou outra origem de medição. A tabela atual é uma referência da entrega, sem comparação de ganho entre revisões.

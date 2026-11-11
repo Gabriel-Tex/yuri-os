@@ -4,7 +4,7 @@ Este repositório implementa os modos finito e infinito da primeira parte do tra
 
 A Recepção cria os dois semáforos antes do Analista e dos clientes. O Atendente confirma saída zero e disponibilidade de `/sem_atend` antes de registrar uma conclusão; seus pedidos de despertar também conduzem a drenagem do arquivo de PIDs.
 
-A revisão final e a matriz de evidências da US27 permanecem pendentes. [Critérios de fechamento](docs/user-stories.md#e08--conformidade-e-fechamento-da-primeira-parte).
+A verificação da primeira parte foi concluída na US27. O registro reúne a matriz de requisitos, os comandos para reproduzir a validação em uma cópia limpa e a referência de satisfação e tempo da entrega. [Verificação da primeira parte](docs/verification.md#us27--verificação-da-primeira-parte).
 
 No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 

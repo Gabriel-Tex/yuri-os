@@ -1,6 +1,6 @@
 # Backlog da primeira parte
 
-As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). As verificações de US01–US22 continuam registradas. A auditoria posterior encontrou lacunas de conformidade e casos de falha fora da cobertura existente. O fechamento da primeira parte depende de US23–US27. [Evidências da auditoria](verification.md#auditoria-de-conformidade-após-o-épico-7).
+As histórias abaixo organizam a implementação descrita na [arquitetura](architecture.md). R01–R18 são requisitos do professor, P01–P05 descrevem o cliente do enunciado e D01–D13 são decisões do projeto. Consulte também as [convenções do repositório](../AGENTS.md). US23–US26 trataram as lacunas da auditoria após o épico 7. A US27 verificou a revisão de entrega da primeira parte. [Evidências executadas](verification.md#matriz-de-evidências-executadas).
 
 ## Como usar o backlog
 
@@ -518,7 +518,7 @@ Resultado: compilação reproduzível, compatibilidade demonstrada e medidas con
 
 ## E08 — Conformidade e fechamento da primeira parte
 
-Resultado: cumprir o texto e o diagrama do professor e verificar a revisão final com o cliente da página 3. US23–US26 foram implementadas; US27 permanece aberta.
+Resultado: o épico foi concluído com a verificação dos requisitos do texto e do diagrama e a execução com o cliente da página 3 na revisão de entrega.
 
 ### US23 — Cumprir o protocolo de sincronização do diagrama
 
@@ -595,6 +595,8 @@ Resultado: cumprir o texto e o diagrama do professor e verificar a revisão fina
 
 ### US27 — Validar a revisão final contra todos os requisitos
 
+**Estado:** concluída em 2026-11-10 na revisão de código `bdea2df`. [Comandos, resultados e limitações](verification.md#us27--verificação-da-primeira-parte).
+
 **Tipo:** técnico · **Depende de:** US22–US26 · **Cobre:** R01–R18 e P01–P05.
 
 **Entrega:** evidência reproduzível da versão de entrega, a partir de uma cópia limpa das fontes.
@@ -651,7 +653,7 @@ As dependências específicas de cada história prevalecem sobre o agrupamento d
 | R17 — Cliente oficial preservado | US07–US08, US15, US20–US21 | Fonte conferida e teste com executável oficial. |
 | R18 — Tempo total | US03, US16, US18–US19, US22, US26 | Relógio monotônico do início da CLI ao fim da limpeza. |
 
-A US27 aplica a matriz inteira à revisão final. As evidências anteriores registram os casos exercitados em cada etapa.
+A US27 aplicou a matriz inteira à revisão de entrega. Os resultados por requisito e por item do contrato do cliente estão na [matriz de evidências executadas](verification.md#matriz-de-evidências-executadas).
 
 ## Cenários que atravessam módulos
 
