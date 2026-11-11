@@ -23,8 +23,27 @@ ANALYST_COORDINATOR_OBJECT = $(BUILD_DIR)/src/app/analyst_coordinator.o
 SERVICE_OBJECT = $(BUILD_DIR)/src/app/service.o
 WORKERS_OBJECT = $(BUILD_DIR)/src/app/workers.o
 CONTROLLED_CLIENT_OBJECT = $(BUILD_DIR)/tests/fixtures/controlled_client.o
-TEST_OBJECTS = $(BUILD_DIR)/tests/domain_test.o $(BUILD_DIR)/tests/client_queue_test.o $(BUILD_DIR)/tests/metrics_test.o $(BUILD_DIR)/tests/scheduler_test.o $(BUILD_DIR)/tests/processes_test.o $(BUILD_DIR)/tests/demand_test.o $(BUILD_DIR)/tests/ipc_test.o $(BUILD_DIR)/tests/completion_file_test.o $(BUILD_DIR)/tests/analyst_test.o $(BUILD_DIR)/tests/analyst_coordinator_test.o $(BUILD_DIR)/tests/service_test.o $(BUILD_DIR)/tests/reception_test.o $(BUILD_DIR)/tests/attendant_test.o $(BUILD_DIR)/tests/finite_service_test.o $(BUILD_DIR)/tests/ownership_test.o $(BUILD_DIR)/tests/stop_phase_test.o $(BUILD_DIR)/tests/fixtures/slow_analyst.o
-DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(INTERRUPT_OBJECT:.o=.d) $(COMPLETION_OBJECT:.o=.d) $(TERMINAL_OBJECT:.o=.d) $(ANALYST_COORDINATOR_OBJECT:.o=.d) $(SERVICE_OBJECT:.o=.d) $(WORKERS_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d) $(BUILD_DIR)/tests/terminal_test.d $(BUILD_DIR)/tests/infinite_service_test.d $(BUILD_DIR)/src/analyst_main.d $(BUILD_DIR)/src/service_main.d
+TEST_OBJECTS = \
+    $(BUILD_DIR)/tests/domain/domain_test.o \
+    $(BUILD_DIR)/tests/domain/client_queue_test.o \
+    $(BUILD_DIR)/tests/domain/metrics_test.o \
+    $(BUILD_DIR)/tests/runtime/scheduler_test.o \
+    $(BUILD_DIR)/tests/platform/processes_test.o \
+    $(BUILD_DIR)/tests/platform/demand_test.o \
+    $(BUILD_DIR)/tests/platform/ipc_test.o \
+    $(BUILD_DIR)/tests/platform/completion_file_test.o \
+    $(BUILD_DIR)/tests/platform/terminal_test.o \
+    $(BUILD_DIR)/tests/platform/analyst_test.o \
+    $(BUILD_DIR)/tests/app/analyst_coordinator_test.o \
+    $(BUILD_DIR)/tests/app/service_test.o \
+    $(BUILD_DIR)/tests/app/reception_test.o \
+    $(BUILD_DIR)/tests/app/attendant_test.o \
+    $(BUILD_DIR)/tests/app/finite_service_test.o \
+    $(BUILD_DIR)/tests/app/infinite_service_test.o \
+    $(BUILD_DIR)/tests/app/ownership_test.o \
+    $(BUILD_DIR)/tests/app/stop_phase_test.o \
+    $(BUILD_DIR)/tests/fixtures/slow_analyst.o
+DEPENDENCIES = $(CLIENT_OBJECT:.o=.d) $(QUEUE_OBJECT:.o=.d) $(METRICS_OBJECT:.o=.d) $(CLOCK_OBJECT:.o=.d) $(SCHEDULER_OBJECT:.o=.d) $(PROCESSES_OBJECT:.o=.d) $(DEMAND_OBJECT:.o=.d) $(IPC_OBJECT:.o=.d) $(INTERRUPT_OBJECT:.o=.d) $(COMPLETION_OBJECT:.o=.d) $(TERMINAL_OBJECT:.o=.d) $(ANALYST_COORDINATOR_OBJECT:.o=.d) $(SERVICE_OBJECT:.o=.d) $(WORKERS_OBJECT:.o=.d) $(CONTROLLED_CLIENT_OBJECT:.o=.d) $(TEST_OBJECTS:.o=.d) $(BUILD_DIR)/src/analyst_main.d $(BUILD_DIR)/src/service_main.d
 
 .PHONY: all client test test-client debug clean
 
@@ -47,43 +66,43 @@ client:
 	@exit 1
 endif
 
-$(BUILD_DIR)/terminal_test: $(TERMINAL_OBJECT) $(BUILD_DIR)/tests/terminal_test.o
+$(BUILD_DIR)/terminal_test: $(TERMINAL_OBJECT) $(BUILD_DIR)/tests/platform/terminal_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/domain_test: $(CLIENT_OBJECT) $(BUILD_DIR)/tests/domain_test.o
+$(BUILD_DIR)/domain_test: $(CLIENT_OBJECT) $(BUILD_DIR)/tests/domain/domain_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/client_queue_test: $(CLIENT_OBJECT) $(QUEUE_OBJECT) $(BUILD_DIR)/tests/client_queue_test.o
+$(BUILD_DIR)/client_queue_test: $(CLIENT_OBJECT) $(QUEUE_OBJECT) $(BUILD_DIR)/tests/domain/client_queue_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/metrics_test: $(CLIENT_OBJECT) $(METRICS_OBJECT) $(CLOCK_OBJECT) $(BUILD_DIR)/tests/metrics_test.o
+$(BUILD_DIR)/metrics_test: $(CLIENT_OBJECT) $(METRICS_OBJECT) $(CLOCK_OBJECT) $(BUILD_DIR)/tests/domain/metrics_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/scheduler_test: $(SCHEDULER_OBJECT) $(BUILD_DIR)/tests/scheduler_test.o
+$(BUILD_DIR)/scheduler_test: $(SCHEDULER_OBJECT) $(BUILD_DIR)/tests/runtime/scheduler_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 $(BUILD_DIR)/controlled_client: $(CONTROLLED_CLIENT_OBJECT)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/processes_test: $(PROCESSES_OBJECT) $(BUILD_DIR)/tests/processes_test.o
+$(BUILD_DIR)/processes_test: $(PROCESSES_OBJECT) $(BUILD_DIR)/tests/platform/processes_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/demand_test: $(DEMAND_OBJECT) $(PROCESSES_OBJECT) $(CLOCK_OBJECT) $(BUILD_DIR)/tests/demand_test.o
+$(BUILD_DIR)/demand_test: $(DEMAND_OBJECT) $(PROCESSES_OBJECT) $(CLOCK_OBJECT) $(BUILD_DIR)/tests/platform/demand_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/ipc_test: $(IPC_OBJECT) $(BUILD_DIR)/tests/ipc_test.o
+$(BUILD_DIR)/ipc_test: $(IPC_OBJECT) $(BUILD_DIR)/tests/platform/ipc_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/completion_file_test: $(COMPLETION_OBJECT) $(BUILD_DIR)/tests/completion_file_test.o
+$(BUILD_DIR)/completion_file_test: $(COMPLETION_OBJECT) $(BUILD_DIR)/tests/platform/completion_file_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 $(BUILD_DIR)/analyst: $(COMPLETION_OBJECT) $(IPC_OBJECT) $(BUILD_DIR)/src/analyst_main.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/analyst_test: $(COMPLETION_OBJECT) $(IPC_OBJECT) $(PROCESSES_OBJECT) $(BUILD_DIR)/tests/analyst_test.o
+$(BUILD_DIR)/analyst_test: $(COMPLETION_OBJECT) $(IPC_OBJECT) $(PROCESSES_OBJECT) $(BUILD_DIR)/tests/platform/analyst_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/analyst_coordinator_test: $(ANALYST_COORDINATOR_OBJECT) $(COMPLETION_OBJECT) $(IPC_OBJECT) $(PROCESSES_OBJECT) $(SCHEDULER_OBJECT) $(BUILD_DIR)/tests/analyst_coordinator_test.o
+$(BUILD_DIR)/analyst_coordinator_test: $(ANALYST_COORDINATOR_OBJECT) $(COMPLETION_OBJECT) $(IPC_OBJECT) $(PROCESSES_OBJECT) $(SCHEDULER_OBJECT) $(BUILD_DIR)/tests/app/analyst_coordinator_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 SERVICE_DEPENDENCIES = $(SERVICE_OBJECT) $(ANALYST_COORDINATOR_OBJECT) $(COMPLETION_OBJECT) $(IPC_OBJECT) $(INTERRUPT_OBJECT) $(PROCESSES_OBJECT) $(SCHEDULER_OBJECT) $(CLOCK_OBJECT) $(TERMINAL_OBJECT) $(WORKERS_OBJECT) $(CLIENT_OBJECT) $(QUEUE_OBJECT) $(METRICS_OBJECT) $(DEMAND_OBJECT)
@@ -91,28 +110,28 @@ SERVICE_DEPENDENCIES = $(SERVICE_OBJECT) $(ANALYST_COORDINATOR_OBJECT) $(COMPLET
 $(BUILD_DIR)/service: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/src/service_main.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/service_test.o
+$(BUILD_DIR)/service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/service_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/reception_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/reception_test.o
+$(BUILD_DIR)/reception_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/reception_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/attendant_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/attendant_test.o
+$(BUILD_DIR)/attendant_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/attendant_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/finite_service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/finite_service_test.o
+$(BUILD_DIR)/finite_service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/finite_service_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/infinite_service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/infinite_service_test.o
+$(BUILD_DIR)/infinite_service_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/infinite_service_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/ownership_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/ownership_test.o
+$(BUILD_DIR)/ownership_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/ownership_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 $(BUILD_DIR)/slow_analyst: $(COMPLETION_OBJECT) $(IPC_OBJECT) $(BUILD_DIR)/tests/fixtures/slow_analyst.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(BUILD_DIR)/stop_phase_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/stop_phase_test.o
+$(BUILD_DIR)/stop_phase_test: $(SERVICE_DEPENDENCIES) $(BUILD_DIR)/tests/app/stop_phase_test.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 $(BUILD_DIR)/%.o: %.c
@@ -132,23 +151,23 @@ test: all
 	./$(BUILD_DIR)/analyst_test $(abspath $(BUILD_DIR)/analyst)
 	./$(BUILD_DIR)/analyst_coordinator_test $(abspath $(BUILD_DIR)/analyst)
 	./$(BUILD_DIR)/service_test $(abspath $(BUILD_DIR)/analyst)
-	./tests/service_cli_test.sh $(abspath $(BUILD_DIR)/service)
+	./tests/cli/service_cli_test.sh $(abspath $(BUILD_DIR)/service)
 	./$(BUILD_DIR)/reception_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/attendant_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/finite_service_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/infinite_service_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/ownership_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/controlled_client)
 	./$(BUILD_DIR)/stop_phase_test $(abspath $(BUILD_DIR)/analyst) $(abspath $(BUILD_DIR)/slow_analyst) $(abspath $(BUILD_DIR)/controlled_client)
-	bash ./tests/finite_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
-	bash ./tests/infinite_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
-	bash ./tests/error_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
+	bash ./tests/cli/finite_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
+	bash ./tests/cli/infinite_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
+	bash ./tests/cli/error_service_test.sh $(abspath $(BUILD_DIR)/service) $(abspath $(BUILD_DIR)/controlled_client)
 
 debug:
 	$(MAKE) BUILD_DIR=build/debug CFLAGS='-O0 -g3' test
 
 test-client: client $(BUILD_DIR)/service $(BUILD_DIR)/analyst
-	bash ./tests/finite_service_test.sh $(abspath $(BUILD_DIR)/service)
-	bash ./tests/infinite_service_test.sh $(abspath $(BUILD_DIR)/service)
+	bash ./tests/cli/finite_service_test.sh $(abspath $(BUILD_DIR)/service)
+	bash ./tests/cli/infinite_service_test.sh $(abspath $(BUILD_DIR)/service)
 
 clean:
 	$(RM) -r -- build

@@ -73,7 +73,8 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 ├── docs/
 │   ├── architecture.md
 │   ├── user-stories.md
-│   └── verification.md
+│   ├── verification.md
+│   └── team-study-guide.md
 ├── provided/
 │   ├── README.md
 │   └── client.c
@@ -99,23 +100,15 @@ Toda implementação busca maximizar a taxa de satisfação e minimizar o tempo 
 │       ├── interrupt.{h,c}
 │       └── clock.{h,c}
 ├── tests/
-│   ├── domain_test.c
-│   ├── scheduler_test.c
-│   ├── processes_test.c
-│   ├── demand_test.c
-│   ├── ipc_test.c
-│   ├── completion_file_test.c
-│   ├── analyst_test.c
-│   ├── analyst_coordinator_test.c
-│   ├── service_test.c
-│   ├── ownership_test.c
-│   ├── service_cli_test.sh
-│   ├── reception_test.c
-│   ├── integration_test.sh
-│   ├── terminal_test.c
-│   ├── infinite_service_test.{c,sh}
-│   ├── stop_phase_test.c
-│   ├── error_service_test.sh
+│   ├── README.md
+│   ├── domain/{client_queue,domain,metrics}_test.c
+│   ├── runtime/scheduler_test.c
+│   ├── platform/{analyst,completion_file,demand,ipc,processes,terminal}_test.c
+│   ├── app/{analyst_coordinator,attendant,finite_service,infinite_service,
+│   │        ownership,reception,service,stop_phase}_test.c
+│   ├── cli/{service_cli,finite_service,infinite_service,error_service}_test.sh
+│   ├── cli/finite_report.awk
+│   ├── performance/benchmark.sh
 │   └── fixtures/{controlled_client,slow_analyst}.c
 ├── build/
 └── run/
@@ -133,6 +126,7 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `docs/architecture.md` | Registrar requisitos, decisões, contratos e fluxos. |
 | `docs/user-stories.md` | Organizar entregas, aceite, dependências e rastreabilidade. |
 | `docs/verification.md` | Registrar comandos, resultados e condições de medição efetivamente usados. |
+| `docs/team-study-guide.md` | Dividir o estudo e a apresentação entre três partes com interfaces compartilhadas. |
 | `provided/README.md` | Registrar origem, versão e peculiaridades do cliente oficial. |
 | `provided/client.c` | Preservar a listagem de `cliente.c` confirmada para a entrega. |
 | `src/service_main.c` | Validar `N` e `X`, iniciar o serviço e apresentar o relatório. |
@@ -151,21 +145,14 @@ Cada par `{h,c}` corresponde a dois arquivos: o `.h` define o contrato usado por
 | `src/platform/terminal.h` / `.c` | Definir e implementar leitura de s, entrada não bloqueante e restauração do terminal. |
 | `src/platform/interrupt.h` / `.c` | Registrar `SIGINT` e `SIGTERM` com flag segura e restaurar máscara e handlers. |
 | `src/platform/clock.h` / `.c` | Definir instantes/durações e implementar relógio monotônico e conversões verificadas. |
-| `tests/domain_test.c` | Cobrir fila, prioridade, prazo e métricas com tempos artificiais. |
-| `tests/scheduler_test.c` | Cobrir alternância, espera, despertar e liberação dos contextos. |
-| `tests/processes_test.c` | Cobrir criação, estados e recolhimento de filhos reais por meio da fixture. |
-| `tests/demand_test.c` | Cobrir a sessão de inicialização e a validação do arquivo com filhos reais. |
-| `tests/ipc_test.c` | Cobrir exclusão de instância, semáforos e limpeza parcial com recursos POSIX reais. |
-| `tests/completion_file_test.c` | Cobrir inclusão, validação, saída e compactação dos PIDs sob proteção. |
-| `tests/analyst_test.c` | Cobrir paradas, retomadas e falhas do processo Analista. |
-| `tests/analyst_coordinator_test.c` | Cobrir política de despertar e drenagem com Analista e runtime reais. |
-| `tests/service_test.c` / `service_cli_test.sh` | Cobrir preparação, limpeza e validação da entrada com caminhos reais. |
-| `tests/ownership_test.c` | Cobrir saídas agrupadas, eventos recolhidos durante a limpeza de outro proprietário e `SIGTERM` bloqueado. |
-| `tests/reception_test.c` | Cobrir geração finita, contínua, fila cheia e demanda inválida com filhos reais. |
-| `tests/integration_test.sh` | Exercitar os três executáveis, protocolos, limites, erros e encerramento. |
-| `tests/terminal_test.c`, `infinite_service_test.{c,sh}`, `error_service_test.sh` | Verificar entrada, parada, drenagem, sinais e falhas da CLI. |
-| `tests/stop_phase_test.c` e `tests/fixtures/slow_analyst.c` | Sincronizar `s` com criação, inicialização, fila cheia, atendimento e lote ativo do Analista; conferir TTY e recursos. |
-| `tests/fixtures/controlled_client.c` | Produzir estados, falhas e demandas controladas para os testes de plataforma. |
+| `tests/README.md` | Explicar a divisão da suíte e seus comandos públicos. |
+| `tests/domain/` | Verificar registro, fila, prioridade e métricas com dados e instantes determinísticos. |
+| `tests/runtime/` | Verificar contextos, round-robin, espera, despertar e liberação de pilhas. |
+| `tests/platform/` | Verificar processos, demanda, IPC, arquivo, terminal e Analista com recursos reais quando necessário. |
+| `tests/app/` | Verificar Recepção, Atendente, coordenação, modos finito e infinito, propriedade e parada por fase. |
+| `tests/cli/` | Verificar a interface executável e validar relatórios em scripts de integração. |
+| `tests/fixtures/` | Fornecer cliente controlado e Analista lento para reproduzir estados e falhas. |
+| `tests/performance/` | Repetir e validar medições finitas, sem misturá-las à suíte funcional. |
 
 ### Limites dos módulos
 
@@ -382,7 +369,7 @@ Desenvolver domínio, runtime, processos/IPC e Analista com testes isolados; dep
 
 Cobrir N = 1, N > 100 e N = 0; X ímpar; igualdade e ultrapassagem da paciência; fila cheia; demanda serializada; lotes de 1, 10, 11 e 27; s nos diferentes estados; falhas parciais; restauração do terminal e recolhimento de filhos. Compilar código próprio com avisos fortes. Ferramentas de memória podem ter limitações com `ucontext`; ThreadSanitizer isoladamente não demonstra a correção do escalonador.
 
-`tests/benchmark.sh` repete a CLI finita em série com uma carga explícita. O verificador usado pelos testes de CLI confere N PIDs distintos e a coerência dos contadores antes de extrair satisfeitos, concluídos e tempo total do relatório. A medição usa o relógio do próprio serviço, incluindo inicialização, drenagem e limpeza. Registre ambiente, versão, carga, saída e número de repetições ao comparar execuções. O cliente controlado usa demanda fixa, e o do enunciado preserva a semente baseada no relógio.
+`tests/performance/benchmark.sh` repete a CLI finita em série com uma carga explícita. O verificador usado pelos testes de CLI confere N PIDs distintos e a coerência dos contadores antes de extrair satisfeitos, concluídos e tempo total do relatório. A medição usa o relógio do próprio serviço, incluindo inicialização, drenagem e limpeza. Registre ambiente, versão, carga, saída e número de repetições ao comparar execuções. O cliente controlado usa demanda fixa, e o do enunciado preserva a semente baseada no relógio.
 
 ## Referências técnicas
 

@@ -3,7 +3,7 @@ set -euo pipefail
 if [[ $# -ne 4 || ! $1 =~ ^(official|controlled)$ ||
       ! $2 =~ ^[1-9][0-9]*$ || ! $3 =~ ^[1-9][0-9]*$ ||
       ! $4 =~ ^[1-9][0-9]{0,2}$ ]]; then
-    echo 'Uso: bash tests/benchmark.sh {official|controlled} N X REPETIÇÕES (N, X > 0; 1 a 999 repetições)' >&2
+    echo 'Uso: bash tests/performance/benchmark.sh {official|controlled} N X REPETIÇÕES (N, X > 0; 1 a 999 repetições)' >&2
     exit 2
 fi
 
@@ -11,7 +11,7 @@ client_kind=$1
 count=$2
 patience=$3
 repetitions=$4
-root=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd -P)
 client_path="$root/build/client"
 client_env=(env -u SERVICE_CLIENT_PATH -u CONTROLLED_CLIENT_MODE LC_ALL=C)
 if [[ $client_kind == controlled ]]; then
@@ -37,7 +37,7 @@ for ((iteration = 1; iteration <= repetitions; iteration++)); do
         exit 1
     fi
     if ! metrics=$(LC_ALL=C awk -v expected="$count" -v emit=1 \
-        -f "$root/tests/finite_report.awk" "$test_dir/out"); then
+        -f "$root/tests/cli/finite_report.awk" "$test_dir/out"); then
         printf 'Relatório inválido na repetição %d\n' "$iteration" >&2
         exit 1
     fi

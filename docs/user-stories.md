@@ -18,7 +18,7 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 **Tipo:** técnico · **Depende de:** nada · **Cobre:** R05, R13; D11.
 
-**Estado:** concluída em 2026-10-22. Registro e transições em `src/domain/client.{h,c}`, com cinco grupos de testes determinísticos em `tests/domain_test.c`. Comandos e limites da verificação estão no [registro](verification.md#us01--registro-e-estados-do-cliente).
+**Estado:** concluída em 2026-10-22. Registro e transições em `src/domain/client.{h,c}`, com cinco grupos de testes determinísticos em `tests/domain/domain_test.c`. Comandos e limites da verificação estão no [registro](verification.md#us01--registro-e-estados-do-cliente).
 
 **Entrega:** um registro com PID, sequência, prioridade, chegada, demanda, prazo e estado. Estados: `STARTING`, `QUEUED`, `IN_SERVICE`, `COMPLETED`, `CANCELLED` e `FAILED`.
 
@@ -31,7 +31,7 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 1. Definir campos, estados e unidades em `src/domain/client.h` e operações verificadas em `src/domain/client.c`.
 2. Documentar transições e transferência de propriedade entre Recepção, fila e Atendente.
-3. Adicionar casos de prioridades, estados, X par/ímpar e limites em `tests/domain_test.c`.
+3. Adicionar casos de prioridades, estados, X par/ímpar e limites em `tests/domain/domain_test.c`.
 
 **Verificação:** usar registros e instantes artificiais; conferir transição terminal repetida e valores extremos sem consultar o relógio real.
 
@@ -39,7 +39,7 @@ Resultado: domínio testável com dados e instantes artificiais, sem processos n
 
 **Tipo:** técnico · **Depende de:** US01 · **Cobre:** R13, R15; D05–D07.
 
-**Estado:** concluída em 2026-11-05. Fila e reserva em `src/domain/client_queue.{h,c}`, com quatro grupos de testes determinísticos em `tests/client_queue_test.c`. O runtime de eventos foi acrescentado na US06; sua ligação aos eventos de vaga e cliente disponível pela aplicação pertence à US14. Comandos e limites da verificação estão no [registro](verification.md#us02--fila-limitada-e-seleção-edf).
+**Estado:** concluída em 2026-11-05. Fila e reserva em `src/domain/client_queue.{h,c}`, com quatro grupos de testes determinísticos em `tests/domain/client_queue_test.c`. O runtime de eventos foi acrescentado na US06; sua ligação aos eventos de vaga e cliente disponível pela aplicação pertence à US14. Comandos e limites da verificação estão no [registro](verification.md#us02--fila-limitada-e-seleção-edf).
 
 **Entrega:** fila de 100 vagas com reserva para o cliente em inicialização e seleção pelo menor prazo absoluto, desempatada pela ordem de criação.
 
@@ -86,7 +86,7 @@ Resultado: duas threads de usuário com contextos próprios, sem conhecimento da
 
 **Tipo:** técnico · **Depende de:** nada · **Cobre:** R01–R02; D01–D03.
 
-**Estado:** concluída em 2026-11-05. Contextos, pilhas, troca manual e retorno ao escalonador em `src/runtime/scheduler.{h,c}`; dois cenários de ordem de término e falha controlada de alocação em `tests/scheduler_test.c`. O registro de execução está em [verification.md](verification.md#us04--contextos-e-pilhas). O despacho round-robin foi acrescentado na US05 e a espera por condição na US06.
+**Estado:** concluída em 2026-11-05. Contextos, pilhas, troca manual e retorno ao escalonador em `src/runtime/scheduler.{h,c}`; dois cenários de ordem de término e falha controlada de alocação em `tests/runtime/scheduler_test.c`. O registro de execução está em [verification.md](verification.md#us04--contextos-e-pilhas). O despacho round-robin foi acrescentado na US05 e a espera por condição na US06.
 
 **Entrega:** contextos independentes para as rotinas e um contexto do escalonador, com propriedade clara das pilhas.
 
@@ -565,7 +565,7 @@ Resultado: o épico foi concluído com a verificação dos requisitos do texto e
 
 **História:** como executor do modo infinito, quero que o serviço reconheça `s` mesmo com entrada contínua e termine preservando os atendimentos concluídos.
 
-**Lacuna:** `terminal_poll` acumula a indicação de `s`, mas só a devolve quando a leitura chega a EOF ou fica sem bytes. Uma fonte continuamente pronta pode monopolizar a etapa de eventos. Os testes atuais enviam `s` imediato ou após um intervalo, sem sincronizar a tecla com cada fase do atendimento. [Leitura da entrada](../src/platform/terminal.c) · [Teste da CLI](../tests/infinite_service_test.sh).
+**Lacuna:** `terminal_poll` acumula a indicação de `s`, mas só a devolve quando a leitura chega a EOF ou fica sem bytes. Uma fonte continuamente pronta pode monopolizar a etapa de eventos. Os testes atuais enviam `s` imediato ou após um intervalo, sem sincronizar a tecla com cada fase do atendimento. [Leitura da entrada](../src/platform/terminal.c) · [Teste da CLI](../tests/cli/infinite_service_test.sh).
 
 **Aceite:**
 

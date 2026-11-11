@@ -1,6 +1,6 @@
 # Simulador de atendimento de clientes
 
-Implementação em C17 para Linux da **primeira parte** do trabalho prático de Sistemas Operacionais. O programa cria processos clientes, organiza sua espera e mede quantos terminaram dentro do prazo. A Recepção e o Atendente são threads de usuário com contextos próprios, executadas por um escalonador do projeto; o Analista é outro processo e imprime os PIDs dos atendimentos concluídos.
+Implementação da **primeira parte** do trabalho prático de Sistemas Operacionais. O programa cria processos clientes, organiza sua espera e mede quantos terminaram dentro do prazo. A Recepção e o Atendente são threads de usuário com contextos próprios, executadas por um escalonador do projeto; o Analista é outro processo e imprime os PIDs dos atendimentos concluídos.
 
 O projeto exercita troca de contexto, escalonamento, processos, sinais, semáforos POSIX e comunicação por arquivos. A [arquitetura](docs/architecture.md) distingue os requisitos do enunciado das decisões adotadas aqui. A fonte do cliente da entrega e sua proveniência estão em [provided/](provided/README.md).
 
@@ -91,7 +91,7 @@ O código próprio é compilado com C17, `-Wall`, `-Wextra` e `-Wpedantic`. `CC`
 Para medir execuções finitas depois de compilar, use:
 
 ```sh
-bash tests/benchmark.sh official 125 5 5
+bash tests/performance/benchmark.sh official 125 5 5
 ```
 
 O script executa cinco repetições com o cliente fornecido, `N = 125` e `X = 5 ms`, valida os relatórios e escreve CSV em `stdout`. Troque `official` por `controlled` para usar a carga controlada. As duas cargas têm demandas diferentes; compare medições apenas quando cenário, versão e condições forem equivalentes. A [verificação da primeira parte](docs/verification.md#us27--verificação-da-primeira-parte) registra a matriz de requisitos e os testes executados; a [avaliação da compactação do Analista](docs/verification.md#avaliação-do-fsync-por-lote-do-analista) registra as medições posteriores dessa mudança.
@@ -106,7 +106,7 @@ O script executa cinco repetições com o cliente fornecido, `N = 125` e `X = 5 
 | `src/app/` | Coordenação entre Recepção, Atendente, Analista e eventos. |
 | `src/service_main.c` e `src/analyst_main.c` | Entrada da CLI e execução do processo Analista. |
 | `provided/` | Fonte do cliente do enunciado e registro de sua proveniência. |
-| `tests/` | Testes determinísticos, fixtures e testes de integração. |
+| [`tests/`](tests/README.md) | Testes organizados por camada, interface de comando, fixtures e medições. |
 | `build/` e `run/` | Binários e dados temporários gerados; ambos ignorados pelo Git. |
 
 Para aprofundar: [arquitetura e requisitos](docs/architecture.md), [histórias e critérios de aceitação](docs/user-stories.md), [verificações executadas](docs/verification.md), [guia de estudo em três partes](docs/team-study-guide.md) e [instruções de desenvolvimento](AGENTS.md). Mudanças prontas para revisão podem seguir o [modelo de PR](.github/pull_request_template.md).

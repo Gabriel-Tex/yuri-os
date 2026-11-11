@@ -1,5 +1,7 @@
 # Registro de verificação
 
+Os caminhos de `tests/` nas seções históricas abaixo registram os comandos e arquivos das revisões então verificadas. Após a reorganização de 2026-11-11, a estrutura atual e os comandos equivalentes estão em [tests/README.md](../tests/README.md) e na seção [Organização dos testes](#organização-dos-testes). As medições históricas não foram refeitas apenas pela mudança de diretório.
+
 ## US01 — Registro e estados do cliente
 
 Data: 2026-10-22. Ambiente: Linux x86_64, kernel `7.0.0-28-generic`, GCC 13.3.0 (`cc`, Ubuntu 13.3.0-6ubuntu2~24.04.1). Código próprio compilado em C17 com `-Wall -Wextra -Wpedantic`.
@@ -501,3 +503,18 @@ No infinito, foram executados seis pares com `./build/service 0 5` e cliente ofi
 A variante foi mais rápida em 35 de 36 pares finitos. A satisfação do cliente controlado variou e a diferença mediana foi de meio cliente, insuficiente para concluir ganho nessa métrica. O prazo de 1 ms continua difícil mesmo com menor tempo total. A retirada do `fsync` elimina a confirmação de gravação em disco a cada lote e a oportunidade de detectar erros que só aparecem nessa chamada. A avaliação exercitou erros de saída e encerramento controlado, sem simular falha do disco ou queda de energia.
 
 Em 2026-11-11, o commit `eaa844a` foi integrado à `main`. Após a integração, `timeout -k 5s 120s make test` e `timeout -k 5s 120s make test-client` passaram. Os semáforos e diretórios de execução estavam ausentes após as suítes, e o SHA-256 do cliente oficial conferiu com o registro de origem.
+
+## Organização dos testes
+
+Em 2026-11-11, os 24 arquivos que ficavam diretamente em `tests/` foram distribuídos por `domain/`, `runtime/`, `platform/`, `app/`, `cli/` e `performance/`. `fixtures/` permaneceu no lugar. Os binários de teste continuam em `build/` com os mesmos nomes. Uma comparação byte a byte com `HEAD` confirmou que os 23 testes e auxiliares movidos não tiveram o conteúdo alterado; apenas `performance/benchmark.sh` teve seus caminhos internos ajustados.
+
+| Comando executado na árvore de trabalho | Resultado observado |
+|---|---|
+| `timeout -k 5s 120s make -j4` | Compilação concluída com objetos nos novos diretórios. |
+| `timeout -k 5s 120s make test` | Suíte controlada passou, inclusive CLI, processos, sinais e limpeza. |
+| `timeout -k 5s 120s make test-client` | Modos finito e infinito passaram com o cliente fornecido. |
+| `timeout -k 5s 120s make debug` | Suíte controlada passou com objetos em `build/debug/`. |
+| `timeout -k 5s 40s bash tests/performance/benchmark.sh official 11 10000 1` | CSV válido; 11 clientes concluídos em uma execução. É verificação do caminho do script, não uma comparação de desempenho. |
+| `make clean` seguido de `timeout -k 5s 120s make -j4` | Build limpo concluído, sem depender dos objetos anteriores à reorganização. |
+
+A [estrutura atual](../tests/README.md) descreve cada pasta. Os comandos de medições anteriores nesta página continuam associados às revisões em que foram executados; seus caminhos antigos não devem ser usados como instruções para executar a árvore atual.
