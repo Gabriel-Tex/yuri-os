@@ -6,6 +6,8 @@ A Recepção cria os dois semáforos antes do Analista e dos clientes. O Atenden
 
 A verificação da primeira parte foi concluída na US27. O registro reúne a matriz de requisitos, os comandos para reproduzir a validação em uma cópia limpa e a referência de satisfação e tempo da entrega. [Verificação da primeira parte](docs/verification.md#us27--verificação-da-primeira-parte).
 
+A compactação dos lotes do Analista publica o arquivo sob `/sem_block` sem aguardar gravação em disco a cada lote. As medições dessa revisão estão no [registro da otimização](docs/verification.md#avaliação-do-fsync-por-lote-do-analista).
+
 No modo infinito, `build/service 0 X` gera clientes até receber `s` em TTY sem Enter ou em pipe. O atendimento ativo termina; os clientes ainda à espera são cancelados. O relatório usa apenas conclusões no denominador e informa taxa não aplicável se nenhuma ocorreu. A entrada e os recursos próprios são restaurados na saída controlada.
 
 `SIGINT` e `SIGTERM` encerram a execução com diagnóstico e status de erro, recolhem os filhos e restauram o terminal e os sinais. Falhas do cliente, do Analista e de I/O também produzem relatório parcial apenas em `stderr`.

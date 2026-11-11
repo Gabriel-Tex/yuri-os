@@ -367,7 +367,7 @@ O cliente fornecido permaneceu sem alteração. Estes testes comprovam correçã
 
 ## US27 — Verificação da primeira parte
 
-Em 2026-11-10, a revisão de código `bdea2df20a1a67a05a32bf2c41da16ea262c62b1` foi extraída com `git archive` para um diretório novo em `/tmp`. As fontes da aplicação, do cliente e dos testes verificadas abaixo são as da entrega. O commit da US27 registra a evidência e atualiza o estado da documentação.
+Em 2026-11-10, a revisão de código `bdea2df20a1a67a05a32bf2c41da16ea262c62b1` foi extraída com `git archive` para um diretório novo em `/tmp`. Esta seção registra a revisão verificada na US27. A mudança posterior no Analista tem [verificação e medições próprias](#avaliação-do-fsync-por-lote-do-analista).
 
 ### Reprodução e resultados
 
@@ -499,3 +499,5 @@ Para cada cenário finito da tabela, foram executados seis pares de `bash tests/
 No infinito, foram executados seis pares com `./build/service 0 5` e cliente oficial. Um processo de teste iniciou a CLI com stdin em pipe e stdout em arquivo temporário, enviou `s` 500 ms após iniciar o subprocesso e mediu do envio até o retorno da CLI. O envio ocorreu entre 500,02 e 500,27 ms nas 12 execuções. O relatório passou em todos os casos com PIDs únicos antes dos contadores, denominador igual às conclusões, satisfação coerente e tempo positivo. A mediana passou de 57 para 403 conclusões e de 2,83% para 98,58% de satisfação. A mediana entre o envio de `s` e a saída passou de 86,708 para 0,628 ms. A primeira janela inclui a inicialização externa do subprocesso e a segunda inclui drenagem e limpeza.
 
 A variante foi mais rápida em 35 de 36 pares finitos. A satisfação do cliente controlado variou e a diferença mediana foi de meio cliente, insuficiente para concluir ganho nessa métrica. O prazo de 1 ms continua difícil mesmo com menor tempo total. A retirada do `fsync` elimina a confirmação de gravação em disco a cada lote e a oportunidade de detectar erros que só aparecem nessa chamada. A avaliação exercitou erros de saída e encerramento controlado, sem simular falha do disco ou queda de energia.
+
+Em 2026-11-11, o commit `eaa844a` foi integrado à `main`. Após a integração, `timeout -k 5s 120s make test` e `timeout -k 5s 120s make test-client` passaram. Os semáforos e diretórios de execução estavam ausentes após as suítes, e o SHA-256 do cliente oficial conferiu com o registro de origem.
